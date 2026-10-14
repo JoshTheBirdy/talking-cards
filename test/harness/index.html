@@ -1,0 +1,47 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Talking Cards harness</title>
+<style>
+:root, body { --background-primary:#fff; --background-secondary:#f6f6f6; --background-modifier-border:#e3e3e3; --background-modifier-hover:rgba(0,0,0,.05); --background-modifier-active-hover:rgba(124,58,237,.12); --background-modifier-error:#e93147; --text-normal:#222; --text-muted:#5c5c5c; --text-faint:#999; --text-accent:#7c3aed; --text-on-accent:#fff; --text-highlight-bg:rgba(255,208,0,.4); --interactive-accent:#7c3aed; --color-red:#e93147; --color-orange:#ec7500; --color-green:#08b94e; --color-blue:#086ddd; --radius-s:4px; --radius-m:8px; --shadow-s:0 1px 3px rgba(0,0,0,.15); --font-ui-smaller:12px; --font-ui-small:13px; }
+body.theme-dark { --background-primary:#1e1e1e; --background-secondary:#262626; --background-modifier-border:#363636; --background-modifier-hover:rgba(255,255,255,.06); --text-normal:#dadada; --text-muted:#b3b3b3; --text-faint:#666; --text-accent:#a882ff; --interactive-accent:#8a5cf5; }
+* { box-sizing: border-box; }
+body { margin:0; font:14px system-ui, sans-serif; background:var(--background-primary); color:var(--text-normal); display:grid; grid-template-columns:44px 1fr; grid-template-rows:auto auto 1fr auto; grid-template-areas:'ribbon commands' 'ribbon tabs' 'ribbon main' 'ribbon status'; height:100vh; }
+button { font:inherit; color:inherit; background:var(--background-secondary); border:1px solid var(--background-modifier-border); border-radius:var(--radius-s); padding:4px 10px; cursor:pointer; }
+button.mod-cta { background:var(--interactive-accent); color:var(--text-on-accent); border:none; }
+button.mod-warning { background:var(--background-modifier-error); color:#fff; border:none; }
+button:disabled { opacity:.45; cursor:default; }
+.clickable-icon { background:none; border:none; padding:4px 6px; }
+input, select, textarea { font:inherit; color:inherit; background:var(--background-primary); border:1px solid var(--background-modifier-border); border-radius:var(--radius-s); padding:4px 6px; }
+#ribbon { grid-area:ribbon; display:flex; flex-direction:column; gap:6px; padding:6px; border-right:1px solid var(--background-modifier-border); background:var(--background-secondary); }
+#ribbon button { padding:4px; font-size:18px; background:none; border:none; }
+#commands { grid-area:commands; display:flex; flex-wrap:wrap; gap:4px; padding:4px; font-size:11px; border-bottom:1px solid var(--background-modifier-border); }
+#commands button { font-size:11px; padding:2px 6px; }
+#tabs { grid-area:tabs; display:flex; gap:2px; padding:2px 4px; }
+.tab { padding:4px 10px; border-radius:var(--radius-s) var(--radius-s) 0 0; cursor:pointer; color:var(--text-muted); font-size:12px; }
+.tab.is-active { background:var(--background-secondary); color:var(--text-normal); }
+#main { grid-area:main; overflow:hidden; position:relative; }
+.workspace-leaf, .view-container { height:100%; }
+.view-content { height:100%; overflow:auto; padding:0; }
+#status { grid-area:status; display:flex; justify-content:flex-end; gap:12px; padding:2px 10px; font-size:12px; color:var(--text-muted); border-top:1px solid var(--background-modifier-border); }
+#notices { position:fixed; top:10px; right:10px; display:flex; flex-direction:column; gap:6px; z-index:100; }
+.notice { background:var(--background-secondary); border:1px solid var(--background-modifier-border); box-shadow:var(--shadow-s); padding:8px 12px; border-radius:var(--radius-m); max-width:320px; }
+.modal-container { position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:50; }
+.modal { background:var(--background-primary); border-radius:var(--radius-m); padding:16px; width:min(720px, 100vw); max-height:90vh; overflow:auto; position:relative; }
+.modal-close { position:absolute; right:8px; top:8px; background:none; border:none; }
+.modal-title { font-weight:600; font-size:1.1em; margin-bottom:10px; }
+.modal-button-container { display:flex; justify-content:flex-end; gap:8px; }
+.setting-item { display:flex; gap:12px; align-items:center; padding:8px 0; border-top:1px solid var(--background-modifier-border); }
+.setting-item-heading { font-weight:600; margin-top:12px; }
+.setting-item-info { flex:1; }
+.setting-item-description { color:var(--text-muted); font-size:12px; }
+.setting-item-control { display:flex; gap:6px; align-items:center; }
+.fake-editor { padding:12px; margin:0; font-size:13px; white-space:pre-wrap; }
+.fake-editor .is-target { background:var(--text-highlight-bg); }
+.markdown-rendered p { margin:0 0 .4em; }
+body.is-phone { grid-template-columns:36px 1fr; }
+body.is-phone #commands { display:none; }
+</style>
+<link rel="stylesheet" href="../../styles.css">
+<div id="ribbon"></div><div id="commands"></div><div id="tabs"></div><div id="main"></div><div id="status"></div><div id="notices"></div>
+<script>document.write(`<script src="dist/harness.js?v=${Date.now()}"><\/script>`)</script>

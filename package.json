@@ -1,0 +1,23 @@
+{
+  "name": "talking-cards",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit && node esbuild.config.mjs production",
+    "test": "node --test \"test/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "esbuild": "^0.28.2",
+    "obsidian": "^1.14.4",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "onnxruntime-web": "^1.22.0",
+    "phonemizer": "^1.2.1",
+    "ts-fsrs": "^5.4.2"
+  },
+  "license": "GPL-3.0-or-later"
+}

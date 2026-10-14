@@ -1,0 +1,10 @@
+{
+  "id": "talking-cards",
+  "name": "Talking Cards",
+  "version": "0.1.0",
+  "minAppVersion": "1.8.7",
+  "description": "Inline flashcards with FSRS spaced repetition, read aloud.",
+  "author": "JoshTheBirdy",
+  "isDesktopOnly": false,
+  "authorUrl": "https://github.com/JoshTheBirdy"
+}
