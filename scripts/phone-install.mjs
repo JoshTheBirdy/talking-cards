@@ -1,8 +1,9 @@
 // Installs the built plugin into the vault currently open in Obsidian on the phone, by having
 // Obsidian write the files itself (works for vaults in the app's private folder, unlike adb push).
 //   node scripts/phone-install.mjs [settings.json]   (after scripts/phone-cdp.sh)
+//   FILES=dir/ node scripts/phone-install.mjs          installs main.js etc. from dir/ (e.g. a downloaded release)
 import { readFileSync } from "node:fs";
-const root = new URL("../", import.meta.url).pathname;
+const root = process.env.FILES ? process.env.FILES.replace(/\/?$/, "/") : new URL("../", import.meta.url).pathname;
 const files = Object.fromEntries(["main.js", "manifest.json", "styles.css"].map((f) => [f, readFileSync(root + f, "utf8")]));
 const settings = process.argv[2] ? readFileSync(process.argv[2], "utf8") : null;
 const expr = `(async () => {
