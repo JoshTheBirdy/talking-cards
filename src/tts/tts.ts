@@ -47,6 +47,7 @@ export class Tts {
 
   async init() {
     await this.piper.init();
+    void this.piper.cacheSize().catch(() => {}); // for the settings tab, which must not wait for it
     this.systemList = await loadSystemVoices();
     if (this.prefs.readerToken) await this.reader.check();
   }

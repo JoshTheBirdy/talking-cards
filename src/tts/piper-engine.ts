@@ -76,7 +76,8 @@ export class PiperEngine {
   private sentEspeak = new Set<string>();
   private idleTimer: number | null = null;
   private inflight = new Map<string, Promise<Audio>>();
-  private cacheBytes: number | null = null;
+  /** Bytes of cached audio; null until first counted (Tts.init counts it at startup). */
+  cacheBytes: number | null = null;
 
   async init() {
     try {

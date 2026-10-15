@@ -168,7 +168,6 @@
 .tc-swipe-hint[data-grade="2"] { color: var(--color-orange); }
 .tc-swipe-hint[data-grade="3"] { color: var(--color-green); }
 .tc-swipe-hint[data-grade="4"] { color: var(--color-blue); }
-.tc-swipe-legend { text-align: center; color: var(--text-faint); font-size: var(--font-ui-smaller); padding: 2px 12px; flex: none; }
 .tc-kbd { font-size: 10px; color: var(--text-faint); border: 1px solid var(--background-modifier-border); border-radius: 3px; padding: 0 4px; margin-left: 6px; }
 .tc-grade .tc-kbd { margin: 2px 0 0; }
 .tc-answer-bar.tc-two .tc-grade { flex: 1; }
@@ -208,3 +207,6 @@
 .is-phone .tc-stat-value { font-size: 1.15em; }
 .is-phone .tc-stat-label { font-size: 0.7em; line-height: 1.15; }
 .tc-item-inner { font-weight: var(--font-normal); color: var(--text-muted); font-size: 0.9em; }
+.tc-read-toggle.is-active { color: var(--interactive-accent); }
+.tc-preview { height: auto; min-height: 0; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); margin: 8px 0 12px; background: var(--background-primary); }
+.tc-preview .tc-card { padding: 16px; }

@@ -324,6 +324,13 @@ export class ReviewView extends ItemView {
     });
     setIcon(audio, "headphones");
     audio.onclick = () => this.setAudioMode(!this.audioMode);
+    const reading = s.autoReadFront || s.autoReadBack;
+    const speak = head.createEl("button", {
+      cls: `clickable-icon tc-read-toggle${reading ? " is-active" : ""}`,
+      attr: { "aria-label": reading ? "Reading cards aloud — tap to stop" : "Read cards aloud" },
+    });
+    setIcon(speak, reading ? "volume-2" : "volume-x");
+    speak.onclick = () => this.setReadAloud(!reading);
     el.toggleClass("tc-audio", this.audioMode);
     const { n, l, r } = this.counts();
     const cnt = head.createSpan({ cls: "tc-counts" });
@@ -345,15 +352,17 @@ export class ReviewView extends ItemView {
     if (s.showContext && c.context.length) card.createDiv({ cls: "tc-context", text: c.context.join(" › ") });
     const cloze = c.kind === "cloze";
     const answerOnly = this.revealed && !cloze && !s.keepQuestion;
+    const rendering: Promise<void>[] = [];
     if (!answerOnly) {
       const front = this.side(card, "tc-front", this.revealed && cloze ? "back" : "front");
-      void MarkdownRenderer.render(this.app, cloze && this.revealed ? c.back : c.front, front, c.path, this.cardComponent);
+      rendering.push(MarkdownRenderer.render(this.app, cloze && this.revealed ? c.back : c.front, front, c.path, this.cardComponent));
     }
     if (this.revealed && !cloze) {
       if (!answerOnly) card.createEl("hr", { cls: "tc-divider" });
       const backEl = this.side(card, "tc-back", "back");
-      void MarkdownRenderer.render(this.app, c.back, backEl, c.path, this.cardComponent);
+      rendering.push(MarkdownRenderer.render(this.app, c.back, backEl, c.path, this.cardComponent));
     }
+    void Promise.all(rendering).then(() => window.requestAnimationFrame(() => fitText(el, card, s.cardTextSize)));
 
     if (this.countdownEnd > Date.now()) {
       const cd = el.createDiv({ cls: "tc-countdown" });
@@ -363,11 +372,6 @@ export class ReviewView extends ItemView {
 
     const gradeable = this.revealed;
     const swipeOn = s.swipe && gradeable;
-    if (swipeOn && s.swipeLegend) {
-      const arrows: [string, number][] = [["↑", s.swipeUp], ["→", s.swipeRight], ["↓", s.swipeDown], ["←", s.swipeLeft]];
-      const parts = arrows.filter(([, g]) => g).map(([a, g]) => `${a} ${this.study.cram ? "Next" : RATING_NAMES[g - 1]}`);
-      if (parts.length) el.createDiv({ cls: "tc-swipe-legend", text: parts.join("  ·  ") });
-    }
     card.toggleClass("tc-swipeable", swipeOn);
     const tapReveals = !this.revealed && (s.tapToReveal || this.audioMode);
     card.toggleClass("tc-tappable", tapReveals);
@@ -382,7 +386,6 @@ export class ReviewView extends ItemView {
       onDrag: (d) => this.dragFeedback(card, glow, hint, d),
       onThrow: (dir) => this.throwCard(card, glow, hint, dir),
     });
-    window.requestAnimationFrame(() => card.toggleClass("tc-scrolls", card.scrollHeight > card.clientHeight + 4));
 
     const bar = el.createDiv({ cls: "tc-answer-bar" });
     if (!this.revealed) {
@@ -506,6 +509,19 @@ export class ReviewView extends ItemView {
     return cram ? `Cram: ${name}` : name;
   }
 
+  /** The speaker button: read both sides as they appear (sets the two auto-read settings). */
+  private setReadAloud(on: boolean) {
+    const s = this.plugin.settings;
+    s.autoReadFront = on;
+    s.autoReadBack = on;
+    void this.plugin.saveSettings("none");
+    this.render();
+    if (!on) return this.plugin.tts.stop();
+    this.plugin.tts.unlock(); // this tap is the gesture mobile needs before audio can play
+    this.plugin.tts.warm();
+    void this.say(this.revealed ? "back" : "front", true);
+  }
+
   /** Also takes over from audio mode's timer when the user taps first. */
   private reveal() {
     if (!this.current || this.revealed) return;
@@ -603,4 +619,19 @@ function shuffle<T>(a: T[]): T[] {
     [out[i], out[j]] = [out[j], out[i]];
   }
   return out;
+}
+
+/**
+ * Shrinks a long card's text until it fits (to two-thirds of the chosen size), so cards rarely
+ * scroll: a scrolling card can only be swiped sideways, since up/down drags scroll it.
+ */
+function fitText(view: HTMLElement, card: HTMLElement, base: number) {
+  const overflows = () => card.scrollHeight > card.clientHeight + 4;
+  let size = base;
+  view.setCssProps({ "--tc-card-size": `${size}em` });
+  while (overflows() && size > base * 0.66) {
+    size = Math.round((size - 0.05) * 100) / 100;
+    view.setCssProps({ "--tc-card-size": `${size}em` });
+  }
+  card.toggleClass("tc-scrolls", overflows());
 }

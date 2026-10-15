@@ -33,7 +33,6 @@ export interface ReviewSettings {
   swipeLeft: GradeOrNone;
   /** Pixels a drag must travel to count. */
   swipeThreshold: number;
-  swipeLegend: boolean;
   haptics: boolean;
   /** em */
   cardTextSize: number;
@@ -91,9 +90,8 @@ const DEFAULTS: Settings = {
   swipeDown: 1,
   swipeLeft: 2,
   swipeThreshold: 72,
-  swipeLegend: true,
   haptics: true,
-  cardTextSize: 1.3,
+  cardTextSize: 1.1,
   cardAlign: "center",
   tapToReveal: true,
   keepQuestion: true,
@@ -239,6 +237,8 @@ export default class TalkingCards extends Plugin {
   }
 
   async study(scope: StudyScope, leaf?: WorkspaceLeaf) {
+    // Called from a tap: let audio start now, so the first card can be read aloud straight away.
+    if (this.settings.autoReadFront || this.settings.autoReadBack) this.tts.unlock();
     const target = leaf ?? this.app.workspace.getLeavesOfType(REVIEW_VIEW)[0] ?? this.app.workspace.getLeaf("tab");
     await target.setViewState({ type: REVIEW_VIEW, active: true, state: { ...scope } });
     void this.app.workspace.revealLeaf(target);
@@ -422,17 +422,46 @@ class SettingsTab extends PluginSettingTab {
       .setName("Swipe distance")
       .setDesc("How far to drag before letting go grades. Shorter = more sensitive.")
       .addSlider((sl) => sl.setLimits(40, 200, 4).setValue(s.swipeThreshold).setDynamicTooltip().onChange((v) => ((s.swipeThreshold = v), void save())));
-    toggle("Show swipe directions", "A small reminder under the card.", "swipeLegend");
     toggle("Haptic tick", "A short vibration when a swipe is far enough to count (phone).", "haptics");
 
-    new Setting(el).setName("Review screen").setHeading();
+    new Setting(el).setName("Review screen").setHeading().setDesc("The preview shows the settings below as you change them.");
+    const preview = cardPreview(el);
+    const update = () => preview(s);
+    update();
+    const live = <K extends keyof ReviewSettings>(name: string, desc: string, key: K) =>
+      new Setting(el)
+        .setName(name)
+        .setDesc(desc)
+        .addToggle((t) =>
+          t.setValue(s[key] as boolean).onChange((v) => {
+            (s[key] as boolean) = v;
+            update();
+            void save();
+          }),
+        );
     new Setting(el)
       .setName("Card text size")
-      .addSlider((sl) => sl.setLimits(0.9, 2.4, 0.05).setValue(s.cardTextSize).setDynamicTooltip().onChange((v) => ((s.cardTextSize = v), void save())));
-    choose("Card text alignment", "", "cardAlign", [["center", "Centred"], ["left", "Left"]], (v) => v as "left" | "center");
+      .setDesc("Long cards shrink to fit the screen, down to about two-thirds of this.")
+      .addSlider((sl) =>
+        sl.setLimits(0.8, 2.4, 0.05).setValue(s.cardTextSize).setDynamicTooltip().onChange((v) => {
+          s.cardTextSize = v;
+          update();
+          void save();
+        }),
+      );
+    new Setting(el).setName("Card text alignment").addDropdown((d) =>
+      d
+        .addOptions({ center: "Centred", left: "Left" })
+        .setValue(s.cardAlign)
+        .onChange((v) => {
+          s.cardAlign = v as "left" | "center";
+          update();
+          void save();
+        }),
+    );
     toggle("Tap the card to reveal", "Tap anywhere on the card instead of the Show answer button.", "tapToReveal");
-    toggle("Keep the question visible", "Off: the answer replaces the question when revealed.", "keepQuestion");
-    toggle("Show where the card is from", "Note › heading › parent bullet, above the question.", "showContext");
+    live("Keep the question visible", "Off: the answer replaces the question when revealed.", "keepQuestion");
+    live("Show where the card is from", "Note › heading › parent bullet, above the question.", "showContext");
     toggle("Progress bar", "", "showProgress");
     choose("Grade buttons", "Two buttons is simpler; FSRS works fine with Again/Good only.", "gradeButtons", [["4", "Again · Hard · Good · Easy"], ["2", "Again · Good"]], (v) => Number(v) as 2 | 4);
     toggle("Show next interval on buttons", "", "showIntervals");
@@ -574,8 +603,12 @@ class SettingsTab extends PluginSettingTab {
       .setDesc("While audio mode is on.")
       .addToggle((t) => t.setValue(s.keepAwake).onChange((v) => ((s.keepAwake = v), this.plugin.saveSettings("none"))));
 
-    const cache = new Setting(el).setName("Audio cache").setDesc("Cards are spoken once and kept, so repeats play instantly.");
-    void tts.piper.cacheSize().then((n) => cache.setDesc(`${formatBytes(n)} of ${s.audioCacheMb} MB used. Cards are spoken once and kept, so repeats play instantly.`)).catch(() => {});
+    // Size known from startup. Don't update the row later: on mobile, changing a setting's text after
+    // the tab opened makes Obsidian redraw the whole tab, and the update would run again, forever.
+    const used = tts.piper.cacheBytes;
+    const cache = new Setting(el)
+      .setName("Audio cache")
+      .setDesc(`${used === null ? "" : `${formatBytes(used)} of ${s.audioCacheMb} MB used. `}Cards are spoken once and kept, so repeats play instantly.`);
     cache
       .addText((t) => {
         t.inputEl.type = "number";
@@ -615,4 +648,21 @@ function steps(v: string, fallback: string[]): string[] {
   const out = v.split(/[\s,]+/).filter((x) => /^\d+(\.\d+)?[mhd]$/.test(x));
   if (!out.length) new Notice("Steps look like: 1m 10m");
   return out.length ? out : fallback;
+}
+
+/** A sample revealed card styled like the review screen; call the returned function to restyle it. */
+function cardPreview(parent: HTMLElement): (s: ReviewSettings) => void {
+  const box = parent.createDiv({ cls: "tc-preview tc-review" });
+  const card = box.createDiv({ cls: "tc-card" });
+  const ctx = card.createDiv({ cls: "tc-context", text: "Biology › Cells" });
+  const front = card.createDiv({ cls: "tc-side tc-front", text: "What does the mitochondrion do?" });
+  const hr = card.createEl("hr", { cls: "tc-divider" });
+  card.createDiv({ cls: "tc-side tc-back", text: "It makes ATP — the cell's energy — by aerobic respiration." });
+  return (s) => {
+    box.setCssProps({ "--tc-card-size": `${s.cardTextSize}em` });
+    box.toggleClass("tc-align-center", s.cardAlign === "center");
+    ctx.toggle(s.showContext);
+    front.toggle(s.keepQuestion);
+    hr.toggle(s.keepQuestion);
+  };
 }
