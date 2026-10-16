@@ -6,6 +6,15 @@ import ortGlue from "../../vendor/onnxruntime/ort-wasm-simd-threaded.glue.js";
 import { Phonemizer, PiperVoice, configureOrt } from "./piper-core.ts";
 import type { FromWorker, ToWorker } from "./protocol.ts";
 
+// Obsidian's desktop app gives workers Node.js (`process`, `require`). The speech engines check
+// for `process` and, finding it, try to load Node modules (worker_threads) that a web worker
+// can't import: "no available backend found". Hide it so they take their browser path.
+try {
+  (self as unknown as { process?: unknown }).process = undefined;
+} catch {
+  // not writable: nothing to hide
+}
+
 let phonemizer: Phonemizer | null = null;
 const voices = new Map<string, PiperVoice>();
 
