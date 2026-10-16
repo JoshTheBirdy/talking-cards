@@ -4,7 +4,8 @@
 import * as ort from "onnxruntime-web/wasm";
 
 /** Must match the onnxruntime-web version in package.json and vendor/onnxruntime. */
-export const ORT_WASM_URL = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort-wasm-simd-threaded.wasm";
+/** Never fetched: the engine's bytes ship in main.js. onnxruntime-web@1.22.0 */
+const ORT_WASM_NAME = "ort-wasm-simd-threaded.wasm";
 
 export const ESPEAK_ROOT = "/usr/share/espeak-ng-data";
 /** espeak files every language needs. Plus `lang/<family>/<voice>` and `<lang>_dict` per voice. */
@@ -149,7 +150,7 @@ export function configureOrt(wasm: ArrayBuffer, glueUrl?: string) {
   ort.env.wasm.wasmBinary = wasm;
   // The wasm path is never fetched (the bytes are above), but without one the glue tries to
   // resolve a URL relative to its own blob: address and throws.
-  if (glueUrl) ort.env.wasm.wasmPaths = { mjs: glueUrl, wasm: ORT_WASM_URL };
+  if (glueUrl) ort.env.wasm.wasmPaths = { mjs: glueUrl, wasm: ORT_WASM_NAME };
   ort.env.wasm.numThreads = 1;
   ort.env.wasm.proxy = false;
 }

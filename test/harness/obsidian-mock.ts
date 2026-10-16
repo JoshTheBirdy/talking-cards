@@ -55,7 +55,10 @@ export function setIcon(el: HTMLElement, name: string) {
 export async function requestUrl(r: { url: string; method?: string; headers?: Record<string, string>; body?: string; throw?: boolean }) {
   const res = await fetch(r.url, { method: r.method ?? "GET", headers: r.headers, body: r.body });
   const arrayBuffer = await res.arrayBuffer();
-  return { status: res.status, arrayBuffer, text: new TextDecoder().decode(arrayBuffer), json: null };
+  const text = new TextDecoder().decode(arrayBuffer);
+  let json: unknown = null;
+  try { json = JSON.parse(text); } catch { /* not JSON */ }
+  return { status: res.status, arrayBuffer, text, json };
 }
 
 export class Notice {
@@ -112,6 +115,7 @@ export class Component {
 // ---------- vault ----------
 export class TFolder {
   constructor(public path: string) {}
+  get children() { return ((window as any).app.vault.getFiles() as TFile[]).filter((f) => f.parent.path === this.path); }
   get name() { return this.path.split("/").pop()!; }
 }
 export class TFile {
@@ -142,7 +146,7 @@ class Vault extends Events {
   getName() { return "test-vault"; }
   getFiles() { return [...this.files.values()].map((f) => f.file); }
   getMarkdownFiles() { return this.getFiles().filter((f) => f.extension === "md"); }
-  getAbstractFileByPath(p: string) { return this.files.get(p)?.file ?? (this.folders.has(p) ? new TFolder(p) : null); }
+  getAbstractFileByPath(p: string) { return this.files.get(p)?.file ?? (this.folders.has(p) || [...this.files.keys()].some((k) => k.startsWith(p + "/")) ? new TFolder(p) : null); }
   getResourcePath(f: TFile) { return `../../test-vault/${encodeURI(f.path)}`; }
   async read(f: TFile) { return this.files.get(f.path)!.text; }
   async cachedRead(f: TFile) { return this.files.get(f.path)!.text; }

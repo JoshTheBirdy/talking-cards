@@ -9,6 +9,12 @@ and mobile, with no other plugins needed.
 - **Swipe to grade on phones**, or use buttons and keyboard shortcuts.
 - **Dashboard** with decks, a card browser, and stats (heatmap, forecast, retention).
 - **Your notes are never changed** unless you opt in to card IDs. Edited cards keep their progress.
+- **Images and image occlusion.** Put pictures on cards, or cover parts of a diagram and learn them one by one.
+
+<p>
+  <img src="docs/images/phone-occlusion-question.png" alt="An image occlusion card on a phone: a cell diagram with one label covered" width="270">
+  <img src="docs/images/phone-occlusion-answer.png" alt="The same card revealed, with the answer and the four grade buttons" width="270">
+</p>
 
 ## Writing cards
 
@@ -77,13 +83,13 @@ voices work without it.
 ## Network use
 
 Talking Cards only goes online when you download a voice or open the voice store. It sends no
-telemetry and has no accounts. It downloads:
+telemetry and has no accounts. Everything it downloads is data, not code: the speech engine
+(onnxruntime-web 1.22.0) ships inside `main.js`. It downloads:
 
 | What | From | When |
 |---|---|---|
 | Voice list and voice models | `huggingface.co/rhasspy/piper-voices` | Voice store, when you install a voice |
 | Pronunciation data (espeak-ng) | `huggingface.co/csukuangfj/vits-piper-en_GB-alba-medium` | When you install a voice for a new language |
-| Speech engine (onnxruntime-web 1.22.0 WebAssembly, 11 MB) | `cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0` | Once, with your first voice; checked against a fixed SHA-256 |
 
 **Phone voices:** the optional companion-app connection only talks to `127.0.0.1` on your
 phone.
@@ -91,7 +97,7 @@ phone.
 ## Licence
 
 GPL-3.0-or-later. The phonemizer bundled in `main.js` includes espeak-ng (GPL-3.0), so the
-plugin as a whole is GPL. Bundled and downloaded components keep their own licences:
+plugin as a whole is GPL. Bundled components keep their own licences:
 
 - piper-phonemize: MIT
 - sherpa-onnx: Apache-2.0

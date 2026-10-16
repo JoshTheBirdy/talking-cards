@@ -1,12 +1,12 @@
 // Built-in neural voices: downloads, the worker that runs them, and the audio cache.
 import { requestUrl } from "obsidian";
 import workerSource from "tts-worker-source";
-import { ORT_WASM_URL, espeakFilesFor, type EspeakFile, type PiperConfig } from "./piper-core.ts";
+import ortWasmGz from "ort-wasm-gz";
+import { espeakFilesFor, type EspeakFile, type PiperConfig } from "./piper-core.ts";
 import type { FromWorker, ToWorker } from "./protocol.ts";
 import { download, hashKey, idb, sha256 } from "./storage.ts";
 
 const ORT_SHA256 = "71aef04959c5c1b6de461b6538e2058e306610034a85aad2742d0c7fd4533fe4";
-const ORT_SIZE = 11_210_254;
 
 const VOICES_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main";
 // espeak-ng-data, one file at a time, from sherpa-onnx's mirror of a Piper voice.
@@ -100,13 +100,8 @@ export class PiperEngine {
     }
   }
 
-  /** Downloads the engine (once), the voice, and its espeak language files; then speed-tests it. */
+  /** Downloads the voice and its espeak language files, then speed-tests it. (The engine ships in main.js.) */
   async install(v: CatalogueVoice, onProgress: (what: string, loaded: number, total: number) => void, signal?: AbortSignal) {
-    if (!(await idb.get("files", "ort-wasm"))) {
-      const wasm = await download(ORT_WASM_URL, ORT_SIZE, (l, t) => onProgress("Voice engine", l, t), signal);
-      if ((await sha256(wasm)) !== ORT_SHA256) throw new Error("Voice engine download is corrupt (checksum mismatch)");
-      await idb.put("files", "ort-wasm", wasm);
-    }
     const onnxPath = Object.keys(v.files).find((p) => p.endsWith(".onnx"))!;
     const jsonPath = Object.keys(v.files).find((p) => p.endsWith(".onnx.json"))!;
     const config = JSON.parse(new TextDecoder().decode(await download(`${VOICES_BASE}/${jsonPath}`, undefined, undefined, signal))) as PiperConfig;
@@ -179,8 +174,9 @@ export class PiperEngine {
 
   private boot(): Promise<void> {
     this.booting ??= (async () => {
-      const ort = await idb.get<ArrayBuffer>("files", "ort-wasm");
-      if (!ort) throw new Error("No voices installed yet — open the voice store in Talking Cards settings");
+      if (!this.installed.size) throw new Error("No voices installed yet — open the voice store in Talking Cards settings");
+      const ort = await engineWasm();
+      void idb.del("files", "ort-wasm").catch(() => {}); // 0.1.x downloaded it; it now ships in main.js
       this.workerUrl = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
       this.worker = new Worker(this.workerUrl);
       this.worker.onmessage = (e: MessageEvent<FromWorker>) => {
@@ -359,4 +355,12 @@ function fromPcm(p: Int16Array): Float32Array {
 export function formatBytes(n: number): string {
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
   return `${(n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+}
+
+/** Unpacks the engine shipped in main.js (gzip, base64) and checks it's intact. */
+async function engineWasm(): Promise<ArrayBuffer> {
+  const gz = Uint8Array.from(atob(ortWasmGz), (c) => c.charCodeAt(0));
+  const wasm = await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+  if ((await sha256(wasm)) !== ORT_SHA256) throw new Error("Voice engine is damaged (checksum mismatch); reinstall Talking Cards");
+  return wasm;
 }

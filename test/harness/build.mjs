@@ -1,5 +1,6 @@
 // Bundles the plugin with the fake Obsidian API into dist/harness.js.
 import esbuild from "esbuild";
+import { ortWasm } from "../../scripts/ort-wasm-plugin.mjs";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,7 +43,7 @@ await esbuild.build({
   target: "es2022",
   alias: { obsidian: join(here, "obsidian-mock.ts") },
   define: { VAULT: JSON.stringify(vault) },
-  plugins: [workerSource],
+  plugins: [workerSource, ortWasm],
   sourcemap: "inline",
   logLevel: "warning",
 });

@@ -125,7 +125,7 @@ Engine interface, every engine implements:
 | Engine | Where | Notes |
 |---|---|---|
 | **System** (Web Speech API) | desktop default where voices exist | Windows → SAPI, macOS → system voices. Not available on Android or Flatpak Linux. |
-| **Built-in neural** (Piper: onnxruntime-web + piper-phonemize) | default on Android and Linux; optional everywhere | Engine 11 MB + ~60 MB per voice + <1 MB language data, downloaded once per device into IndexedDB. Single-threaded WASM in a worker. |
+| **Built-in neural** (Piper: onnxruntime-web + piper-phonemize) | default on Android and Linux; optional everywhere | Engine ships in main.js (gzipped, ~3 MB); ~60 MB per voice + <1 MB language data, downloaded once per device into IndexedDB. Single-threaded WASM in a worker. |
 
 Lessons carried over from the Reader app and an earlier read-aloud script:
 - **Use fp32 Piper models, never int8** — int8 adds audible hiss (Reader issue #1). ~67 MB/voice.

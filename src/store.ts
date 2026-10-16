@@ -1,4 +1,4 @@
-import { Events, Platform, TFile, normalizePath, type App } from "obsidian";
+import { Events, Platform, TFile, TFolder, normalizePath, type App } from "obsidian";
 import { formatLogFile, parseLogFile, logFileName, isLogFileName, deviceOf } from "./logfile.ts";
 import {
   applyEntry, dayKey, groupByKey, makeFsrs, replayKeys, todayCounts,
@@ -68,7 +68,10 @@ export class ReviewStore extends Events {
     this.f = makeFsrs(this.sched());
     this.own.clear();
     this.others.clear();
-    for (const file of this.app.vault.getFiles()) {
+    // Logs live directly in the data folder; no need to walk the whole vault.
+    const folder = this.app.vault.getAbstractFileByPath(normalizePath(this.folder()));
+    const files = folder instanceof TFolder ? folder.children.filter((f): f is TFile => f instanceof TFile) : [];
+    for (const file of files) {
       if (!this.isLogFile(file.path)) continue;
       const list = parseLogFile(await this.app.vault.cachedRead(file));
       (deviceOf(file.name) === this.deviceId ? this.own : this.others).set(file.path, list);
@@ -246,7 +249,7 @@ export class ReviewStore extends Events {
       const text = formatLogFile(this.deviceId, this.own.get(path) ?? []);
       const existing = this.app.vault.getAbstractFileByPath(path);
       if (existing instanceof TFile) {
-        await this.app.vault.modify(existing, text);
+        await this.app.vault.process(existing, () => text);
       } else {
         const dir = path.slice(0, path.lastIndexOf("/"));
         if (dir && !this.app.vault.getAbstractFileByPath(dir)) await this.app.vault.createFolder(dir).catch(() => {});

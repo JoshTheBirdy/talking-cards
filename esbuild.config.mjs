@@ -1,4 +1,5 @@
 import esbuild from "esbuild";
+import { ortWasm } from "./scripts/ort-wasm-plugin.mjs";
 import { builtinModules } from "node:module";
 
 const prod = process.argv[2] === "production";
@@ -39,7 +40,7 @@ const ctx = await esbuild.context({
   minify: prod,
   treeShaking: true,
   outfile: "main.js",
-  plugins: [workerSource],
+  plugins: [workerSource, ortWasm],
 });
 
 if (prod) {

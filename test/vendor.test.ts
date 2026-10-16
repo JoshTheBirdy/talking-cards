@@ -10,5 +10,5 @@ test("onnxruntime glue carries the blob-URL patch (see vendor/onnxruntime/README
 test("vendored onnxruntime matches the installed package version", () => {
   const pkg = JSON.parse(readFileSync(new URL("../node_modules/onnxruntime-web/package.json", import.meta.url), "utf8"));
   const core = readFileSync(new URL("../src/tts/piper-core.ts", import.meta.url), "utf8");
-  assert.ok(core.includes(`onnxruntime-web@${pkg.version}/`), `piper-core.ts ORT_WASM_URL should name ${pkg.version}`);
+  assert.ok(core.includes(`onnxruntime-web@${pkg.version} `), `piper-core.ts should name onnxruntime-web@${pkg.version}`);
 });
