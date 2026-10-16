@@ -90,3 +90,21 @@ test("replayKeys matches a full replay for the cards it touches", async () => {
   replayKeys(states, groupByKey(more), ["a"], f, S);
   assert.deepEqual(states, replay(more, f, S));
 });
+
+test("seeded shuffle: same seed same order, different seed different order, nothing lost", async () => {
+  const { seededShuffle } = await import("../src/scheduler.ts");
+  const items = Array.from({ length: 50 }, (_, i) => i);
+  const a = seededShuffle(items, "2026-10-16|deck|Bio");
+  assert.deepEqual(a, seededShuffle(items, "2026-10-16|deck|Bio"));
+  assert.notDeepEqual(a, seededShuffle(items, "2026-10-17|deck|Bio"));
+  assert.notDeepEqual(a, items);
+  assert.deepEqual([...a].sort((x, y) => x - y), items);
+});
+
+test("shuffled pool: new cards come from the whole deck, not its first notes", async () => {
+  const { seededShuffle } = await import("../src/scheduler.ts");
+  const deck = cards(200);
+  const q = buildQueue(seededShuffle(deck, "seed"), new Map(), { newToday: 0, reviewsToday: 0, blocksToday: new Set() }, T0, limits, 4);
+  assert.equal(q.new.length, 20);
+  assert.ok(q.new.some((c) => Number(c.key.slice(1)) >= 100), "picks reach past the first half");
+});

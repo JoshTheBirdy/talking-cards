@@ -208,7 +208,7 @@
 .is-phone .tc-stat-label { font-size: 0.7em; line-height: 1.15; }
 .tc-item-inner { font-weight: var(--font-normal); color: var(--text-muted); font-size: 0.9em; }
 .tc-read-toggle.is-active { color: var(--interactive-accent); }
-.tc-preview { height: auto; min-height: 0; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); margin: 8px 0 12px; background: var(--background-primary); }
+.tc-preview { display: block; height: auto; min-height: 0; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); margin: 8px 0 12px; background: var(--background-primary); }
 .tc-preview .tc-card { padding: 16px; }
 
 /* ---------- Images on cards ---------- */
@@ -247,3 +247,4 @@
 .tc-occ-row.is-selected input { border-color: var(--interactive-accent); }
 .tc-occ-num { width: 1.6em; text-align: center; font-weight: var(--font-semibold); color: var(--text-muted); }
 .tc-occ-editor-modal { width: min(900px, 100vw); }
+.tc-preview .tc-card { flex: none; }

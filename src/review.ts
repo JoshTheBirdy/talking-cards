@@ -9,7 +9,7 @@ import { tick } from "./haptics.ts";
 
 const AUDIO_MODE_KEY = "talking-cards-audio-mode";
 import {
-  buildQueue, mixQueue, preview, formatInterval, isLearning, isNew, endOfDay,
+  buildQueue, mixQueue, preview, formatInterval, isLearning, isNew, endOfDay, dayKey, seededShuffle,
   RATING_NAMES, type LogEntry, type Rating,
 } from "./scheduler.ts";
 
@@ -137,9 +137,12 @@ export class ReviewView extends ItemView {
       const store = this.plugin.store;
       const s = this.plugin.settings;
       const byKey = new Map(cards.map((c) => [c.key, c]));
-      const q = buildQueue(cards, store.states, store.today(now), now, s, s.dayStartHour);
+      // Shuffled: pick new cards from anywhere in the section, not just its first notes.
+      const shuffled = s.newSort === "random";
+      const pool = shuffled ? seededShuffle(cards, `${dayKey(now, s.dayStartHour)}|${this.study.kind}|${this.study.value}`) : cards;
+      const q = buildQueue(pool, store.states, store.today(now), now, s, s.dayStartHour);
       for (const c of q.learning) this.pending.set(c.key, { card: byKey.get(c.key)!, due: +store.state(c.key)!.fsrs.due });
-      if (s.newSort === "random") q.new = shuffle(q.new);
+      if (shuffled) q.review = shuffle(q.review);
       const order = s.newOrder === "first" ? [...q.new, ...q.review] : s.newOrder === "last" ? [...q.review, ...q.new] : mixQueue(q);
       this.main = order.map((c) => byKey.get(c.key)!);
       if (s.sessionLimit > 0) this.main = this.main.slice(0, s.sessionLimit);

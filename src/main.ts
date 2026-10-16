@@ -106,7 +106,7 @@ const DEFAULTS: Settings = {
   reduceMotion: false,
   sessionLimit: 0,
   newOrder: "mix",
-  newSort: "note",
+  newSort: "random",
 };
 
 export default class TalkingCards extends Plugin {
@@ -476,7 +476,7 @@ class SettingsTab extends PluginSettingTab {
     new Setting(el).setName("Study session").setHeading();
     num(el, "Cards per session", "Stop after this many (learning steps still finish). 0 = no limit.", s.sessionLimit, (v) => ((s.sessionLimit = v), save()));
     choose("New cards", "Where new cards go among your reviews.", "newOrder", [["mix", "Mixed in"], ["first", "Before reviews"], ["last", "After reviews"]], (v) => v as "mix" | "first" | "last");
-    choose("New card order", "", "newSort", [["note", "As written in notes"], ["random", "Random"]], (v) => v as "note" | "random");
+    choose("Card order", "Shuffled picks new cards from anywhere in the deck or note you study (the same picks all day) and mixes up reviews. As written: top to bottom.", "newSort", [["random", "Shuffled"], ["note", "As written in notes"]], (v) => v as "note" | "random");
   }
 
   /**
