@@ -1,7 +1,8 @@
 // Finds flashcards in a note's Markdown. Pure: no Obsidian imports, so it runs under `node --test`.
 // Syntax is documented in SCOPE.md §3.
+import { parseOcclusion, type Occlusion } from "./occlusion.ts";
 
-export type BlockKind = "basic" | "bidi" | "multi" | "multi-bidi" | "list" | "cloze";
+export type BlockKind = "basic" | "bidi" | "multi" | "multi-bidi" | "list" | "cloze" | "occlusion";
 
 /** One card definition in the source. A block expands to one or more reviewable cards. */
 export interface CardBlock {
@@ -28,6 +29,8 @@ export interface Card {
   front: string;
   back: string;
   context: string[];
+  /** Image occlusion cards: the image, its boxes, and which box this card asks about. */
+  occlusion?: Occlusion & { target: string };
 }
 
 export interface ParseOptions {
@@ -57,6 +60,8 @@ export function parseNote(text: string, opts: ParseOptions = DEFAULT_PARSE_OPTIO
   let i = skipFrontmatter(lines);
   let fence: string | null = null;
   let fenceCards = false;
+  /** Inside an ```occlusion block: where it started and its lines. */
+  let occ: { start: number; body: string[] } | null = null;
   let inComment = false;
   let inMath = false;
   let para: number[] = [];
@@ -71,6 +76,20 @@ export function parseNote(text: string, opts: ParseOptions = DEFAULT_PARSE_OPTIO
     const trimmed = line.trim();
 
     if (fence) {
+      if (occ && trimmed.startsWith(fence)) {
+        // The image path is the question (it names the card); the box list is the answer.
+        const o = parseOcclusion(occ.body.join("\n"));
+        if (o.image && o.boxes.length) {
+          blocks.push({ kind: "occlusion", id: null, question: o.image, answer: occ.body.join("\n"), firstLine: occ.start, lastLine: i, context: headings.filter((h) => h) });
+        }
+        occ = null;
+        fence = null;
+        continue;
+      }
+      if (occ) {
+        occ.body.push(line);
+        continue;
+      }
       if (trimmed.startsWith(fence)) {
         if (fenceCards) flush(true);
         fence = null;
@@ -93,6 +112,10 @@ export function parseNote(text: string, opts: ParseOptions = DEFAULT_PARSE_OPTIO
     if (f) {
       flush();
       fence = f[1];
+      if (trimmed.slice(f[1].length).trim() === "occlusion") {
+        occ = { start: i, body: [] };
+        continue;
+      }
       // A plain ``` block (no language) may hold a deck of `;;` cards, kept there for copying.
       fenceCards = !!opts.codeBlockCards && trimmed.slice(f[1].length).trim() === "";
       continue;
@@ -371,6 +394,16 @@ export function expandBlock(b: CardBlock, opts: ParseOptions = DEFAULT_PARSE_OPT
         { ...base, key: id, front: b.question, back: b.answer },
         { ...base, key: `${id}#r`, front: b.answer, back: b.question },
       ];
+    case "occlusion": {
+      const o = parseOcclusion(b.answer);
+      return o.boxes.map((box, i) => ({
+        ...base,
+        key: `${id}#o${box.id}`,
+        front: `Image occlusion: ${o.image} (${i + 1} of ${o.boxes.length})`,
+        back: box.label || `Box ${i + 1}`,
+        occlusion: { ...o, target: box.id },
+      }));
+    }
     case "cloze": {
       const spans = findClozes(b.question, opts);
       const groups = [...new Set(spans.map((s) => s.group))].sort((a, z) => a - z);
@@ -407,10 +440,16 @@ export function fnv64(s: string): string {
  * written into the note. Same question + answer → same ID, in any note or device; editing
  * the card's text makes it a new card.
  */
-export function assignTextIds(blocks: CardBlock[]) {
+export function assignTextIds(blocks: CardBlock[], kinds?: BlockKind[]) {
   for (const b of blocks) {
-    if (b.id) continue;
+    if (b.id || (kinds && !kinds.includes(b.kind))) continue;
     const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+    // An occlusion is named by its image alone: editing boxes mustn't make it a new card set.
+    if (b.kind === "occlusion") {
+      b.id = "h" + fnv64(`occlusion\u0000${norm(b.question)}`).slice(0, 12);
+      b.textId = true;
+      continue;
+    }
     b.id = "h" + fnv64(`${b.kind === "bidi" || b.kind === "multi-bidi" ? "bidi" : b.kind}\u0000${norm(b.question)}\u0000${norm(b.answer)}`).slice(0, 12);
     b.textId = true;
   }
@@ -445,6 +484,7 @@ export function addMissingIds(
 ): string | null {
   const seen = new Set<string>();
   const todo = blocks.filter((b) => {
+    if (b.kind === "occlusion") return false; // always image-derived; a fence line can't carry an ID
     if (!b.id || b.textId) return true;
     const dup = duplicates.has(b.id) || seen.has(b.id);
     seen.add(b.id);

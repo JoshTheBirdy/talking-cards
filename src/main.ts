@@ -4,6 +4,7 @@ import { DashboardView, DASHBOARD_VIEW } from "./dashboard.ts";
 import { ReviewView, REVIEW_VIEW, type StudyScope } from "./review.ts";
 import { ReviewStore } from "./store.ts";
 import { EditTracker } from "./edit-tracker.ts";
+import { registerOcclusion } from "./occlusion-view.ts";
 import { parseNote, addMissingIds, type CardBlock } from "./parser.ts";
 import { DEFAULT_SCHEDULER, buildQueue, type QueueLimits, type SchedulerSettings } from "./scheduler.ts";
 import { Tts } from "./tts/tts.ts";
@@ -165,6 +166,8 @@ export default class TalkingCards extends Plugin {
         return true;
       },
     });
+
+    registerOcclusion(this);
 
     this.statusEl = this.addStatusBarItem();
     this.statusEl.addClass("mod-clickable");

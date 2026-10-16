@@ -2,6 +2,7 @@ import { Component, ItemView, MarkdownRenderer, Notice, Scope, TFile, setIcon, t
 import type TalkingCards from "./main.ts";
 import type { Card } from "./parser.ts";
 import { speechFor } from "./speech-text.ts";
+import { addZoomButtons, drawOcclusion } from "./occlusion-view.ts";
 import { allowSleep, keepAwake } from "./wake.ts";
 import { attachSwipe, flingTo, type Direction } from "./swipe.ts";
 import { tick } from "./haptics.ts";
@@ -190,6 +191,7 @@ export class ReviewView extends ItemView {
   }
 
   private speech(c: SessionCard, side: "front" | "back"): string {
+    if (c.occlusion) return side === "front" ? speechFor(c.occlusion.question || "What's hidden?") : speechFor(c.back);
     return speechFor(side === "front" ? c.front : c.back);
   }
 
@@ -353,16 +355,27 @@ export class ReviewView extends ItemView {
     const cloze = c.kind === "cloze";
     const answerOnly = this.revealed && !cloze && !s.keepQuestion;
     const rendering: Promise<void>[] = [];
-    if (!answerOnly) {
+    if (c.occlusion) {
+      const o = c.occlusion;
+      const side = this.side(card, this.revealed ? "tc-back" : "tc-front", this.revealed ? "back" : "front");
+      if (o.question) side.createDiv({ cls: "tc-occ-question", text: o.question });
+      drawOcclusion(side, this.app, o, c.path, this.revealed ? "answer" : "question", o.target);
+      if (this.revealed) side.createDiv({ cls: "tc-occ-answer", text: c.back });
+    } else if (!answerOnly) {
       const front = this.side(card, "tc-front", this.revealed && cloze ? "back" : "front");
       rendering.push(MarkdownRenderer.render(this.app, cloze && this.revealed ? c.back : c.front, front, c.path, this.cardComponent));
     }
-    if (this.revealed && !cloze) {
+    if (this.revealed && !cloze && !c.occlusion) {
       if (!answerOnly) card.createEl("hr", { cls: "tc-divider" });
       const backEl = this.side(card, "tc-back", "back");
       rendering.push(MarkdownRenderer.render(this.app, c.back, backEl, c.path, this.cardComponent));
     }
-    void Promise.all(rendering).then(() => window.requestAnimationFrame(() => fitText(el, card, s.cardTextSize)));
+    void Promise.all(rendering)
+      .then(() => imagesLoaded(card))
+      .then(() => {
+        addZoomButtons(this.app, card);
+        window.requestAnimationFrame(() => fitText(el, card, s.cardTextSize));
+      });
 
     if (this.countdownEnd > Date.now()) {
       const cd = el.createDiv({ cls: "tc-countdown" });
@@ -634,4 +647,10 @@ function fitText(view: HTMLElement, card: HTMLElement, base: number) {
     view.setCssProps({ "--tc-card-size": `${size}em` });
   }
   card.toggleClass("tc-scrolls", overflows());
+}
+
+/** Waits for the card's images, so fitting the text measures the final height. */
+function imagesLoaded(card: HTMLElement): Promise<unknown> {
+  const imgs = Array.from(card.querySelectorAll("img"));
+  return Promise.race([Promise.all(imgs.map((i) => i.decode().catch(() => {}))), new Promise((r) => window.setTimeout(r, 1500))]);
 }

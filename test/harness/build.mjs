@@ -14,6 +14,7 @@ const walk = (d) => {
     const p = join(d, f);
     if (statSync(p).isDirectory()) walk(p);
     else if (f.endsWith(".md")) vault[relative(vaultDir, p)] = readFileSync(p, "utf8");
+    else if (/\.(png|jpe?g|gif|webp|svg)$/i.test(f)) vault[relative(vaultDir, p)] = ""; // served from test-vault/ by the http server
   }
 };
 walk(vaultDir);

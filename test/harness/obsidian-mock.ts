@@ -14,6 +14,8 @@ P.createEl = function (this: HTMLElement, tag: string, o: ElOpts = {}) {
   this.appendChild(e);
   return e;
 };
+(window as any).createSpan = (o: ElOpts = {}) => (document.createElement("div") as any).createSpan(o);
+(window as any).createDiv = (o: ElOpts = {}) => (document.createElement("div") as any).createDiv(o);
 P.createDiv = function (this: HTMLElement & { createEl: Function }, o: ElOpts = {}) { return this.createEl("div", o); };
 P.createSpan = function (this: HTMLElement & { createEl: Function }, o: ElOpts = {}) { return this.createEl("span", o); };
 P.empty = function (this: HTMLElement) { this.innerHTML = ""; };
@@ -141,6 +143,7 @@ class Vault extends Events {
   getFiles() { return [...this.files.values()].map((f) => f.file); }
   getMarkdownFiles() { return this.getFiles().filter((f) => f.extension === "md"); }
   getAbstractFileByPath(p: string) { return this.files.get(p)?.file ?? (this.folders.has(p) ? new TFolder(p) : null); }
+  getResourcePath(f: TFile) { return `../../test-vault/${encodeURI(f.path)}`; }
   async read(f: TFile) { return this.files.get(f.path)!.text; }
   async cachedRead(f: TFile) { return this.files.get(f.path)!.text; }
   private write(f: TFile, text: string) {
@@ -164,6 +167,10 @@ class Vault extends Events {
 
 class MetadataCache extends Events {
   constructor(private app: App) { super(); }
+  getFirstLinkpathDest(link: string, _src: string) {
+    const files = this.app.vault.getFiles();
+    return files.find((f) => f.path === link) ?? files.find((f) => f.path.endsWith("/" + link)) ?? null;
+  }
   getFileCache(f: TFile) {
     const text = this.app.vault.files.get(f.path)?.text ?? "";
     const m = /^---\n([\s\S]*?)\n---/.exec(text);
@@ -293,6 +300,7 @@ export class Plugin extends Component {
   constructor(public app: App) { super(); }
   async loadData() { const v = localStorage.getItem("plugin-data"); return v ? JSON.parse(v) : null; }
   async saveData(d: unknown) { localStorage.setItem("plugin-data", JSON.stringify(d)); }
+  registerMarkdownCodeBlockProcessor(lang: string, fn: (src: string, el: HTMLElement, ctx: unknown) => void) { (window as any).__codeBlocks = { ...((window as any).__codeBlocks ?? {}), [lang]: fn }; }
   registerView(type: string, f: (l: WorkspaceLeaf) => ItemView) { this.app.viewFactories.set(type, f); }
   addRibbonIcon(icon: string, title: string, fn: () => void) {
     const b = document.getElementById("ribbon")!.createEl("button", { text: ICONS[icon] ?? icon, attr: { "aria-label": title, title } });
@@ -389,6 +397,7 @@ class TextC extends Chain {
 class DropdownC extends Chain {
   selectEl = this.el.createEl("select", { cls: "dropdown" }) as HTMLSelectElement;
   addOption(v: string, t: string) { this.selectEl.createEl("option", { value: v, text: t }); return this; }
+  addOptions(o: Record<string, string>) { for (const [v, t] of Object.entries(o)) this.addOption(v, t); return this; }
   setValue(v: string) { this.selectEl.value = v; return this; }
   onChange(f: (v: string) => unknown) { this.selectEl.onchange = () => f(this.selectEl.value); return this; }
 }
@@ -434,10 +443,13 @@ export class Setting {
 }
 
 /** Tiny Markdown: paragraphs, lists, bold/italic, highlights, wikilinks, inline HTML kept. */
+export class MarkdownView { file: TFile | null = null; }
+export class Menu { addItem(_f: unknown) { return this; } }
+
 export const MarkdownRenderer = {
   async render(_app: App, md: string, el: HTMLElement, _src: string, _c: Component) {
     const inline = (s: string) =>
-      s.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/==(.+?)==/g, "<mark>$1</mark>").replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g, "<a>$2</a>").replace(/`([^`]+)`/g, "<code>$1</code>");
+      s.replace(/!\[\[([^\]|]+)[^\]]*\]\]/g, (_m, l: string) => { const f = (window as any).app.metadataCache.getFirstLinkpathDest(l, ""); return f ? `<span class="internal-embed image-embed"><img src="${(window as any).app.vault.getResourcePath(f)}"></span>` : ""; }).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/==(.+?)==/g, "<mark>$1</mark>").replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g, "<a>$2</a>").replace(/`([^`]+)`/g, "<code>$1</code>");
     let html = "";
     let inList = false;
     for (const line of md.split("\n")) {

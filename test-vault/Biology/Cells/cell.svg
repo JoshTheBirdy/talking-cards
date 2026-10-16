@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
+  <rect width="600" height="400" fill="#fdf6e3"/>
+  <ellipse cx="300" cy="200" rx="250" ry="160" fill="#cde8c5" stroke="#4a7c3a" stroke-width="6"/>
+  <circle cx="300" cy="190" r="60" fill="#b9a3d9" stroke="#5b3d8a" stroke-width="4"/>
+  <ellipse cx="160" cy="250" rx="45" ry="22" fill="#f2a65a" stroke="#a35a1a" stroke-width="3"/>
+  <ellipse cx="450" cy="150" rx="45" ry="22" fill="#f2a65a" stroke="#a35a1a" stroke-width="3"/>
+  <circle cx="420" cy="270" r="18" fill="#e57373"/>
+  <g font-family="sans-serif" font-size="20" fill="#222">
+    <text x="262" y="196">Nucleus</text>
+    <text x="100" y="300">Mitochondrion</text>
+    <text x="440" y="310">Lysosome</text>
+    <text x="40" y="60">Cell membrane</text>
+  </g>
+</svg>

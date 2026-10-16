@@ -21,6 +21,11 @@ and mobile, with no other plugins needed.
 | List answer | `Question ;;` then tab-indented lines, or `Question >>>` then a bullet list | Q → list |
 | Cloze | `The {{mitochondria}} makes ATP` or `{{c1::…::hint}}` | one card per gap |
 | Highlight cloze (off by default) | `The ==mitochondria== makes ATP` | one card per highlight |
+| Image occlusion | right-click an image → **Add image occlusion**, then draw boxes | one card per box |
+
+**Images** work anywhere in a card (`What is this? ;; ![[heart.png]]`); a ⤢ button opens them full screen.
+
+**Image occlusion:** put the cursor on a line with an image embed and run *Add image occlusion* (or right-click → Add image occlusion). Drag boxes over the parts to hide and type what's under each. Choose whether a card covers only the asked part or every part. The boxes are saved in the note as a small ```` ```occlusion ```` block under the image — plain text, synced like everything else — and the note shows the image with its boxes and an **Edit boxes** button.
 
 - Code blocks with a language and `%% comments %%` are skipped. `;;` cards inside plain ```` ``` ```` blocks are read; you can turn this off.
 - Frontmatter `cards: false` skips a note.

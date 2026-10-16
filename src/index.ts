@@ -72,9 +72,9 @@ export class CardIndex extends Events {
     const text = await this.app.vault.cachedRead(file);
     // Most notes have no cards: skip the full parse unless a card marker appears at all.
     const s = this.settings();
-    const maybe = text.includes("::") || text.includes(";;") || text.includes(">>>") || /^\s*\?\??\s*$/m.test(text) || (s.braceCloze && text.includes("{{")) || (s.highlightCloze && text.includes("=="));
+    const maybe = text.includes("occlusion") || text.includes("::") || text.includes(";;") || text.includes(">>>") || /^\s*\?\??\s*$/m.test(text) || (s.braceCloze && text.includes("{{")) || (s.highlightCloze && text.includes("=="));
     const blocks = maybe ? parseNote(text, s) : [];
-    if (!s.writeIds) assignTextIds(blocks);
+    assignTextIds(blocks, s.writeIds ? ["occlusion"] : undefined);
     if (!blocks.length) {
       this.remove(file.path, notify);
       edited(blocks);

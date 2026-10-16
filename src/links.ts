@@ -95,7 +95,7 @@ export function similarity(a: string, b: string): number {
   return (2 * both) / (a.length - 1 + (b.length - 1));
 }
 
-const family = (k: BlockKind) => (k === "cloze" ? "cloze" : "qa");
+const family = (k: BlockKind) => (k === "cloze" || k === "occlusion" ? k : "qa");
 
 /** How likely `b` is `a` after an edit, 0–1. */
 export function editScore(a: SnapCard, b: SnapCard): number {
