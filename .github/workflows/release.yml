@@ -1,0 +1,53 @@
+# Builds a release from a version tag (e.g. 0.1.5) and attests the files Obsidian installs, so
+# anyone can verify that main.js, manifest.json and styles.css were built from this repository:
+#   gh attestation verify main.js --repo JoshTheBirdy/talking-cards
+#
+# To release: bump the version in manifest.json, package.json and versions.json, commit, then
+#   git tag -a 0.1.5 -m "What changed" && git push origin 0.1.5
+# The tag's message becomes the release notes.
+name: Release
+
+on:
+  push:
+    tags: ["*.*.*"]
+
+permissions:
+  contents: write # create the release
+  id-token: write # sign the attestation
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Tag matches manifest version
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match manifest.json version $version"
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      - name: Attest release files
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" main.js manifest.json styles.css --title "$GITHUB_REF_NAME" --notes-from-tag --verify-tag
