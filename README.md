@@ -73,6 +73,10 @@ voices work without it.
 
 ## Your data
 
+Talking Cards reads every Markdown note in your vault, because cards can be written in any
+note; folders you list under *Settings → Ignore* are skipped. It writes only its own review logs
+(and, if you turn it on, card IDs into notes). It doesn't access files outside the vault.
+
 - **Review history** goes in `Talking Cards/reviews-<device>-<year>.md` inside your vault, one file per device. Logs from several devices merge cleanly when synced, with no conflicts. You can move the folder in settings.
   - Tip: add that folder to *Settings → Files and links → Excluded files*.
 - **Settings** are stored in the plugin's `data.json`.

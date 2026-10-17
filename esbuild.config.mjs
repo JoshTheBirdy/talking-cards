@@ -4,6 +4,19 @@ import { builtinModules } from "node:module";
 
 const prod = process.argv[2] === "production";
 
+/**
+ * The speech engines' Emscripten glue has a Node.js branch (require("fs") etc.) that never runs in
+ * Obsidian: the worker hides `process`, so they take the browser path. Replace those requires with
+ * `undefined`, so the plugin carries no filesystem access, even unreachable. Handles the
+ * escaped quotes of glue that is embedded as a string.
+ */
+export function stripNodeRequires(code) {
+  return code.replace(
+    /require\((\\?["'])(fs|path|os|crypto|url|util|worker_threads|child_process)\1\)/g,
+    "(void 0)", // no quotes: this text may sit inside a string literal
+  ).replace(/import\((\\?["'])(module|worker_threads|fs|path)\1\)/g, "Promise.reject()");
+}
+
 // The TTS worker (onnxruntime + piper-phonemize) is built separately and embedded in main.js
 // as a string, so Obsidian only parses it when a voice is first used.
 const workerSource = {
@@ -24,7 +37,7 @@ const workerSource = {
         // onnxruntime's bundle mentions import.meta.url; we hand it the wasm bytes instead.
         define: { "import.meta.url": '""' },
       });
-      return { contents: out.outputFiles[0].text, loader: "text", watchFiles: ["src/tts/worker.ts", "src/tts/piper-core.ts"] };
+      return { contents: stripNodeRequires(out.outputFiles[0].text), loader: "text", watchFiles: ["src/tts/worker.ts", "src/tts/piper-core.ts"] };
     });
   },
 };
