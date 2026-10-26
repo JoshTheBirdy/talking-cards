@@ -38,6 +38,7 @@ and mobile, with no other plugins needed.
 - `deck: Some/Deck` overrides the folder deck.
 - `tts-front: es` / `tts-back: en-GB` picks a voice language per note.
 - `%%say: …%%` on a card line changes how it is read aloud.
+- **Choose what you study:** each folder and note in the deck browser has a switch. Switched-off folders (and everything in them) are left out of *Study all*; a card that's also written somewhere still switched on stays in. The switches are saved in `study-folders.md` next to your review history, so every device agrees.
 - The same card written in several notes is one card with one review history. Every folder and note it's in still shows it, and each review shows it once. This is a setting.
 
 ### Editing cards

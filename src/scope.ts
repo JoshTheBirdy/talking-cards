@@ -46,8 +46,12 @@ export function dedupeCopies<T extends CardCopy>(copies: T[], prefer: string): T
   return out;
 }
 
-/** The cards a review serves: every card written inside the scope, each once (when `dedupe`). */
-export function cardsInScope<T extends CardCopy>(copies: T[], scope: Scope, dedupe: boolean, prefer: string): T[] {
-  const inside = scope.kind === "all" ? copies : copies.filter((c) => inScope(c, scope));
+/**
+ * The cards a review serves: every card written inside the scope, each once (when `dedupe`).
+ * `active`: only cards with these keys (see activity.ts); null = no filter.
+ */
+export function cardsInScope<T extends CardCopy>(copies: T[], scope: Scope, dedupe: boolean, prefer: string, active: Set<string> | null = null): T[] {
+  let inside = scope.kind === "all" ? copies : copies.filter((c) => inScope(c, scope));
+  if (active) inside = inside.filter((c) => active.has(c.key));
   return dedupe ? dedupeCopies(inside, prefer) : inside;
 }

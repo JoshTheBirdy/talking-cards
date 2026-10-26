@@ -21,7 +21,7 @@ export function renderStats(el: HTMLElement, plugin: TalkingCards, deck: string)
   const { store, settings, index } = plugin;
   const now = Date.now();
   const h = settings.dayStartHour;
-  const cards = deck ? index.cardsIn({ kind: "deck", value: deck }) : index.allCards();
+  const cards = index.cardsIn(deck ? { kind: "deck", value: deck } : { kind: "all", value: "" }, true);
   const keys = cards.map((c) => c.key);
   const keySet = new Set(keys.map((k) => store.links.canon(k)));
   const { reviews: all } = replayWithReviews(store.entries, store.fsrs, settings, (k) => store.links.canon(k));

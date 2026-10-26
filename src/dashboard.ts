@@ -191,10 +191,12 @@ export class DashboardView extends ItemView {
     if (node !== root) {
       const cards = deckCards(node.path);
       const c = this.plugin.counts(cards);
-      const head = el.createDiv({ cls: "tc-folder-head" });
+      const on = index.isActive(node.path);
+      const head = el.createDiv({ cls: `tc-folder-head${on ? "" : " is-inactive"}` });
       const info = head.createDiv({ cls: "tc-folder-info" });
       info.createDiv({ cls: "tc-folder-title", text: node.name });
-      counts(info, c, cards.length);
+      counts(info, c, cards.length, on);
+      this.activeSwitch(head, node.path, node.name);
       const btn = head.createEl("button", { cls: "mod-cta", text: "Study" });
       btn.disabled = !(c.new + c.due);
       btn.onclick = () => void this.plugin.study({ kind: "deck", value: node.path }, this.leaf);
@@ -213,7 +215,7 @@ export class DashboardView extends ItemView {
         }
         const label: string | [string, string] = inner.length ? [child.name, inner.join(" / ")] : child.name;
         const cards = deckCards(target.path);
-        this.row(list, "folder", label, cards, () => this.openFolder(target.path), () =>
+        this.row(list, "folder", target.path, label, cards, () => this.openFolder(target.path), () =>
           void this.plugin.study({ kind: "deck", value: target.path }, this.leaf),
         );
       }
@@ -228,7 +230,7 @@ export class DashboardView extends ItemView {
         if (!cards.length) continue;
         const name = n.path.split("/").pop()!.replace(/\.md$/, "");
         const study = () => void this.plugin.study({ kind: "note", value: n.path }, this.leaf);
-        this.row(list, "file-text", name, cards, study, study);
+        this.row(list, "file-text", n.path, name, cards, study, study);
       }
     }
     return isTop;
@@ -245,17 +247,39 @@ export class DashboardView extends ItemView {
     this.contentEl.scrollTop = 0;
   }
 
-  /** A sub-deck or note: icon, full name (wraps), counts underneath, quick-study button. */
-  private row(list: HTMLElement, icon: string, label: string | [string, string], cards: IndexedCards, open: () => void, study: () => void) {
+  /**
+   * The on/off switch for studying: off leaves this folder or note (and everything in it) out of
+   * "Study all". Stored in the vault, so every device agrees.
+   */
+  private activeSwitch(parent: HTMLElement, path: string, name: string) {
+    const on = this.plugin.index.isActive(path);
+    const sw = parent.createDiv({
+      cls: `checkbox-container tc-active-switch${on ? " is-enabled" : ""}`,
+      attr: { role: "switch", "aria-checked": String(on), "aria-label": on ? `${name}: studied — tap to leave out` : `${name}: left out of studying — tap to include`, tabindex: "0" },
+    });
+    sw.createEl("input", { type: "checkbox", attr: { tabindex: "-1" } });
+    const flip = (e: Event) => {
+      e.stopPropagation();
+      e.preventDefault();
+      void this.plugin.studyFolders.toggle(path);
+    };
+    sw.addEventListener("click", flip);
+    sw.addEventListener("keydown", (e) => (e.key === " " || e.key === "Enter") && flip(e));
+  }
+
+  /** A sub-deck or note: icon, full name (wraps), counts underneath, study switch, quick-study button. */
+  private row(list: HTMLElement, icon: string, path: string, label: string | [string, string], cards: IndexedCards, open: () => void, study: () => void) {
     const name = typeof label === "string" ? label : label[0];
     const c = this.plugin.counts(cards);
-    const row = list.createDiv({ cls: "tc-item" });
+    const on = this.plugin.index.isActive(path);
+    const row = list.createDiv({ cls: `tc-item${on ? "" : " is-inactive"}` });
     setIcon(row.createSpan({ cls: "tc-item-icon" }), icon);
     const body = row.createDiv({ cls: "tc-item-body" });
     const nameEl = body.createDiv({ cls: "tc-item-name", text: name });
     // Folders inside a one-folder chain: shown quieter, after the deck's own name.
     if (typeof label !== "string") nameEl.createSpan({ cls: "tc-item-inner", text: ` / ${label[1]}` });
-    counts(body, c, cards.length);
+    counts(body, c, cards.length, on);
+    this.activeSwitch(row, path, name);
     const play = row.createEl("button", { cls: "clickable-icon tc-item-study", attr: { "aria-label": `Study ${name}` } });
     setIcon(play, "play");
     play.disabled = !(c.new + c.due);
@@ -268,8 +292,9 @@ export class DashboardView extends ItemView {
 type IndexedCards = { key: string; blockId: string; deck: string; path: string }[];
 
 /** "12 due · 20 new · 3 learning · 345 cards", leaving out zeros. */
-function counts(el: HTMLElement, c: { new: number; learn: number; due: number }, total: number) {
+function counts(el: HTMLElement, c: { new: number; learn: number; due: number }, total: number, active = true) {
   const line = el.createDiv({ cls: "tc-item-counts" });
+  if (!active) line.createSpan({ cls: "tc-pill tc-off", text: "Not studied" });
   const part = (n: number, text: string, cls: string) => {
     if (!n) return;
     line.createSpan({ cls: `tc-pill ${cls}`, text: `${n} ${text}` });

@@ -64,7 +64,7 @@ export class CardBrowser {
     const eod = now + DAY;
     const q = this.query.toLowerCase().trim();
     // A folder lists every card written in it, even ones that also live elsewhere.
-    const base = this.deck ? index.cardsIn({ kind: "deck", value: this.deck }) : index.allCards();
+    const base = index.cardsIn(this.deck ? { kind: "deck", value: this.deck } : { kind: "all", value: "" }, true);
     const rows = base.filter((c) => {
       const st = store.state(c.key);
       switch (this.filter) {

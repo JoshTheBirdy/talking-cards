@@ -2,6 +2,7 @@ import { Events, TFile, type App } from "obsidian";
 import { parseNote, expandBlock, assignTextIds, type Card, type CardBlock, type ParseOptions } from "./parser.ts";
 import { cardsInScope, type Scope } from "./scope.ts";
 import { isLogFileName } from "./logfile.ts";
+import { ACTIVITY_FILE, activeKeys, isActive, type Rules } from "./activity.ts";
 
 export interface NoteCards {
   path: string;
@@ -36,6 +37,9 @@ export class CardIndex extends Events {
   private cache: IndexedCard[] | null = null;
   /** cardsIn() results, per scope. Cleared with `cache`. */
   private scoped = new Map<string, IndexedCard[]>();
+  /** Folders and notes switched off for studying (activity.ts). */
+  private rules: Rules = new Map();
+  private active: Set<string> | null = null;
 
   constructor(private app: App, private settings: () => IndexSettings) {
     super();
@@ -65,7 +69,7 @@ export class CardIndex extends Events {
     const edited = (after: CardBlock[]) => {
       if (notify && this.ready && (before.length || after.length)) this.trigger("edited", file.path, before, after);
     };
-    if (file.extension !== "md" || this.isIgnored(file.path) || isLogFileName(file.name)) {
+    if (file.extension !== "md" || this.isIgnored(file.path) || isLogFileName(file.name) || file.name === ACTIVITY_FILE) {
       this.remove(file.path, notify);
       return;
     }
@@ -119,7 +123,24 @@ export class CardIndex extends Events {
 
   private invalidate() {
     this.cache = null;
+    this.active = null;
     this.scoped.clear();
+  }
+
+  /** New study rules (toggled here or synced from another device). */
+  setRules(rules: Rules) {
+    this.rules = rules;
+    this.invalidate();
+    this.trigger("changed");
+  }
+
+  get studyRules(): Rules {
+    return this.rules;
+  }
+
+  /** Whether a folder or note path is switched on for studying. */
+  isActive(path: string): boolean {
+    return isActive(path, this.rules);
   }
 
   /** Every copy of every card, in note order: a card written in two notes appears twice. */
@@ -131,19 +152,23 @@ export class CardIndex extends Events {
   /**
    * The cards a review serves: every card written in the folder / note / vault. With `dedupe`,
    * copies of the same card count once (they share one history either way).
+   * Studying leaves out inactive cards, unless the scope itself was switched off (then the user
+   * chose it explicitly). `everything`: no activity filter (Browse, Stats).
    */
-  cardsIn(scope: Scope): IndexedCard[] {
-    const id = `${scope.kind}\u0000${scope.value}`;
+  cardsIn(scope: Scope, everything = false): IndexedCard[] {
+    const filter = !everything && this.rules.size > 0 && (scope.kind === "all" || this.isActive(scope.value));
+    const id = `${scope.kind}\u0000${scope.value}\u0000${filter ? 1 : 0}`;
     let list = this.scoped.get(id);
     if (!list) {
       const s = this.settings();
-      list = cardsInScope(this.copies(), scope, s.dedupe, s.dedupePrefer);
+      const active = filter ? (this.active ??= activeKeys(this.copies(), this.rules)) : null;
+      list = cardsInScope(this.copies(), scope, s.dedupe, s.dedupePrefer, active);
       this.scoped.set(id, list);
     }
     return list;
   }
 
-  /** Every card in the vault, each once. */
+  /** Every active card in the vault, each once: what "Study all" serves. */
   allCards(): IndexedCard[] {
     return this.cardsIn({ kind: "all", value: "" });
   }

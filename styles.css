@@ -248,3 +248,8 @@
 .tc-occ-num { width: 1.6em; text-align: center; font-weight: var(--font-semibold); color: var(--text-muted); }
 .tc-occ-editor-modal { width: min(900px, 100vw); }
 .tc-preview .tc-card { flex: none; }
+
+/* Study switches: folders and notes left out of "Study all" */
+.tc-active-switch { flex: none; margin: 0 2px; }
+.tc-item.is-inactive .tc-item-name, .tc-item.is-inactive .tc-item-icon, .tc-folder-head.is-inactive .tc-folder-title { opacity: 0.55; }
+.tc-off { color: var(--text-muted); font-weight: var(--font-semibold); }

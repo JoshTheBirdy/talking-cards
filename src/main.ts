@@ -5,6 +5,7 @@ import { ReviewView, REVIEW_VIEW, type StudyScope } from "./review.ts";
 import { ReviewStore } from "./store.ts";
 import { EditTracker } from "./edit-tracker.ts";
 import { registerOcclusion } from "./occlusion-view.ts";
+import { StudyFolders } from "./study-folders.ts";
 import { parseNote, addMissingIds, type CardBlock } from "./parser.ts";
 import { DEFAULT_SCHEDULER, buildQueue, type QueueLimits, type SchedulerSettings } from "./scheduler.ts";
 import { Tts } from "./tts/tts.ts";
@@ -114,6 +115,7 @@ export default class TalkingCards extends Plugin {
   index!: CardIndex;
   store!: ReviewStore;
   edits!: EditTracker;
+  studyFolders!: StudyFolders;
   tts!: Tts;
   private statusEl!: HTMLElement;
 
@@ -125,6 +127,7 @@ export default class TalkingCards extends Plugin {
     this.index = new CardIndex(this.app, () => this.settings);
     this.store = new ReviewStore(this.app, () => this.settings.dataFolder, () => this.settings);
     this.edits = new EditTracker(this);
+    this.studyFolders = new StudyFolders(this);
     this.tts = new Tts(this.app);
     this.tts.piper.cacheLimit = this.settings.audioCacheMb * 1024 * 1024;
     void this.tts.init();
@@ -188,23 +191,29 @@ export default class TalkingCards extends Plugin {
         }
       }
       await this.store.load();
+      await this.studyFolders.load();
       await this.index.build();
       await this.edits.checkSnapshot();
       this.registerEvent(this.index.on("edited", (...a: unknown[]) => this.edits.onEdited(...(a as [string, CardBlock[], CardBlock[]]))));
       this.registerEvent(this.store.on("changed", () => this.edits.scheduleSave()));
       this.registerEvent(this.app.metadataCache.on("changed", (f) => this.index.update(f)));
-      this.registerEvent(this.app.vault.on("modify", (f) => f instanceof TFile && this.store.onFileChanged(f)));
-      this.registerEvent(this.app.vault.on("create", (f) => f instanceof TFile && this.store.onFileChanged(f)));
+      const changed = (f: TFile, deleted = false) => {
+        void this.store.onFileChanged(f, deleted);
+        this.studyFolders.onFileChanged(f);
+      };
+      this.registerEvent(this.app.vault.on("modify", (f) => f instanceof TFile && changed(f)));
+      this.registerEvent(this.app.vault.on("create", (f) => f instanceof TFile && changed(f)));
       this.registerEvent(
         this.app.vault.on("delete", (f) => {
           this.index.remove(f.path);
-          if (f instanceof TFile) void this.store.onFileChanged(f, true);
+          if (f instanceof TFile) changed(f, true);
         }),
       );
       this.registerEvent(
         this.app.vault.on("rename", (f, old) => {
           this.index.remove(old);
           if (f instanceof TFile) void this.index.update(f);
+          void this.studyFolders.onRenamed(old, f.path);
         }),
       );
     });
