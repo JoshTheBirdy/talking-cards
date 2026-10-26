@@ -20,3 +20,11 @@ test("file names", () => {
   assert.equal(deviceOf(n), "android-k3f9");
   assert.ok(!isLogFileName("notes.md"));
 });
+
+test("dedupeEntries: a log found in two folders counts once", async () => {
+  const { dedupeEntries } = await import("../src/logfile.ts");
+  const a = { t: 1, k: "x", r: 3 as const };
+  const b = { t: 2, k: "x", r: 4 as const };
+  const link = { t: 3, k: "y", a: "link" as const, from: "x" };
+  assert.deepEqual(dedupeEntries([a, b, { ...a }, link, { ...link }, { t: 1, k: "x", r: 1 as const }]), [a, b, link, { t: 1, k: "x", r: 1 }]);
+});

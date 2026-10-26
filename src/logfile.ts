@@ -51,3 +51,22 @@ export function parseLogFile(text: string): LogEntry[] {
   }
   return out;
 }
+
+/** Same entry = same moment, card and action. */
+export function entrySig(e: LogEntry): string {
+  return `${e.t}|${e.k}|${e.r ?? ""}|${e.a ?? ""}|${e.from ?? ""}`;
+}
+
+/**
+ * Drops repeated entries (a device's log found in two folders, or merged from both), keeping the
+ * first of each. Order is otherwise unchanged.
+ */
+export function dedupeEntries(entries: LogEntry[]): LogEntry[] {
+  const seen = new Set<string>();
+  return entries.filter((e) => {
+    const s = entrySig(e);
+    if (seen.has(s)) return false;
+    seen.add(s);
+    return true;
+  });
+}

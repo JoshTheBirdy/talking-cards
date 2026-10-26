@@ -128,6 +128,7 @@ export class TFile {
 }
 
 class Vault extends Events {
+  configDir = ".obsidian";
   files = new Map<string, { file: TFile; text: string }>();
   /** Plugin-folder files (outside the vault's notes), kept in localStorage. */
   adapter = {
@@ -253,6 +254,13 @@ export class Scope {
 export class App {
   vault: Vault;
   metadataCache: MetadataCache;
+  fileManager = {
+    trashFile: async (f: TFile) => {
+      const v = this.vault as unknown as { files: Map<string, { file: TFile; text: string }>; trigger(e: string, f: TFile): void };
+      v.files.delete(f.path);
+      v.trigger("delete", f);
+    },
+  };
   workspace: Workspace;
   scope = new Scope();
   viewFactories = new Map<string, (l: WorkspaceLeaf) => ItemView>();

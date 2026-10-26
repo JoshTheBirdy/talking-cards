@@ -1,6 +1,7 @@
 import { Events, TFile, type App } from "obsidian";
 import { parseNote, expandBlock, assignTextIds, type Card, type CardBlock, type ParseOptions } from "./parser.ts";
 import { cardsInScope, type Scope } from "./scope.ts";
+import { isLogFileName } from "./logfile.ts";
 
 export interface NoteCards {
   path: string;
@@ -64,7 +65,7 @@ export class CardIndex extends Events {
     const edited = (after: CardBlock[]) => {
       if (notify && this.ready && (before.length || after.length)) this.trigger("edited", file.path, before, after);
     };
-    if (file.extension !== "md" || this.isIgnored(file.path)) {
+    if (file.extension !== "md" || this.isIgnored(file.path) || isLogFileName(file.name)) {
       this.remove(file.path, notify);
       return;
     }

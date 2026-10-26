@@ -1,4 +1,4 @@
-import { Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, type App, type WorkspaceLeaf } from "obsidian";
+import { Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, normalizePath, type App, type WorkspaceLeaf } from "obsidian";
 import { CardIndex, type IndexSettings } from "./index.ts";
 import { DashboardView, DASHBOARD_VIEW } from "./dashboard.ts";
 import { ReviewView, REVIEW_VIEW, type StudyScope } from "./review.ts";
@@ -118,7 +118,10 @@ export default class TalkingCards extends Plugin {
   private statusEl!: HTMLElement;
 
   async onload() {
-    this.settings = { ...DEFAULTS, ...((await this.loadData()) as Partial<Settings> | null) };
+    const saved = (await this.loadData()) as Partial<Settings> | null;
+    this.settings = { ...DEFAULTS, ...saved };
+    // A device that never chose a data folder (a fresh install) joins the one the vault already uses.
+    const pickFolder = !saved?.dataFolder;
     this.index = new CardIndex(this.app, () => this.settings);
     this.store = new ReviewStore(this.app, () => this.settings.dataFolder, () => this.settings);
     this.edits = new EditTracker(this);
@@ -177,6 +180,13 @@ export default class TalkingCards extends Plugin {
     this.registerInterval(window.setInterval(() => this.updateStatus(), 60_000));
 
     this.app.workspace.onLayoutReady(async () => {
+      if (pickFolder) {
+        const existing = this.store.logFolders()[0];
+        if (existing !== undefined && existing !== this.settings.dataFolder) {
+          this.settings.dataFolder = existing;
+          await this.saveData(this.settings);
+        }
+      }
       await this.store.load();
       await this.index.build();
       await this.edits.checkSnapshot();
@@ -386,10 +396,15 @@ class SettingsTab extends PluginSettingTab {
       );
     new Setting(containerEl)
       .setName("Data folder")
-      .setDesc("Review history: one .md file per device per year. Add it to Settings → Files and links → Excluded files to keep it out of search.")
-      .addText((t) =>
-        t.setValue(s.dataFolder).onChange((v) => ((s.dataFolder = v.trim() || DEFAULTS.dataFolder), save("store"))),
-      );
+      .setDesc("Where this device saves its review history (one .md file per device per year); it moves its file there. Every device's history is found wherever it is, so devices don't have to agree. Add it to Settings → Files and links → Excluded files to keep it out of search.")
+      .addText((t) => {
+        t.setValue(s.dataFolder);
+        // Applied when you leave the field, not per keystroke: changing it moves this device's log.
+        t.inputEl.addEventListener("change", () => {
+          s.dataFolder = normalizePath(t.getValue().trim() || DEFAULTS.dataFolder);
+          void save("store");
+        });
+      });
     new Setting(containerEl).setName("This device").setDesc(this.plugin.store.deviceId);
   }
 

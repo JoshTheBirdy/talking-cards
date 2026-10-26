@@ -1,5 +1,5 @@
-import { Events, Platform, TFile, TFolder, normalizePath, type App } from "obsidian";
-import { formatLogFile, parseLogFile, logFileName, isLogFileName, deviceOf } from "./logfile.ts";
+import { Events, Platform, TFile, normalizePath, type App } from "obsidian";
+import { formatLogFile, parseLogFile, logFileName, isLogFileName, deviceOf, dedupeEntries, entrySig } from "./logfile.ts";
 import {
   applyEntry, dayKey, groupByKey, makeFsrs, replayKeys, todayCounts,
   type CardState, type DayCounts, type LogEntry, type SchedulerSettings,
@@ -57,9 +57,24 @@ export class ReviewStore extends Events {
     return this.f;
   }
 
+  /**
+   * Any review log, wherever it is. The data folder is a per-device setting, and Sync may not carry
+   * settings, so devices can disagree on it; reading logs from anywhere means none are missed.
+   */
   isLogFile(path: string): boolean {
-    const dir = normalizePath(this.folder());
-    return path.startsWith(dir + "/") && isLogFileName(path.slice(dir.length + 1));
+    if (path.startsWith(this.app.vault.configDir + "/") || path.startsWith(".trash/")) return false;
+    return isLogFileName(path.split("/").pop()!);
+  }
+
+  /** Folders that hold review logs, most logs first. For a fresh install joining an existing vault. */
+  logFolders(): string[] {
+    const n = new Map<string, number>();
+    for (const f of this.app.vault.getFiles()) {
+      if (!this.isLogFile(f.path)) continue;
+      const dir = f.parent?.path ?? "";
+      n.set(dir === "/" ? "" : dir, (n.get(dir) ?? 0) + 1);
+    }
+    return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([d]) => d);
   }
 
   /** Reads every log file and replays it all. At startup and after data-folder or scheduler changes. */
@@ -68,15 +83,26 @@ export class ReviewStore extends Events {
     this.f = makeFsrs(this.sched());
     this.own.clear();
     this.others.clear();
-    // Logs live directly in the data folder; no need to walk the whole vault.
-    const folder = this.app.vault.getAbstractFileByPath(normalizePath(this.folder()));
-    const files = folder instanceof TFolder ? folder.children.filter((f): f is TFile => f instanceof TFile) : [];
-    for (const file of files) {
+    // This device's logs found outside the data folder (the folder setting changed, or a copy
+    // in two folders): merged into the data folder, the stray files moved to the trash after.
+    const stray: TFile[] = [];
+    const ownByName = new Map<string, LogEntry[]>();
+    for (const file of this.app.vault.getFiles()) {
       if (!this.isLogFile(file.path)) continue;
       const list = parseLogFile(await this.app.vault.cachedRead(file));
-      (deviceOf(file.name) === this.deviceId ? this.own : this.others).set(file.path, list);
+      if (deviceOf(file.name) !== this.deviceId) {
+        this.others.set(file.path, list);
+        continue;
+      }
+      ownByName.set(file.name, [...(ownByName.get(file.name) ?? []), ...list]);
+      if (file.path !== this.ownPath(file.name)) stray.push(file);
     }
-    this.entries = [...this.own.values(), ...this.others.values()].flat();
+    for (const [name, list] of ownByName) {
+      const target = this.ownPath(name);
+      this.own.set(target, dedupeEntries(list).sort((a, b) => a.t - b.t));
+    }
+    for (const f of stray) this.dirty.add(this.ownPath(f.name));
+    this.entries = this.allEntries();
     this.regroup();
     // Full replay in chunks, yielding between them.
     const states = new Map<string, CardState>();
@@ -88,6 +114,10 @@ export class ReviewStore extends Events {
     this.states = states;
     this.spread(this.groups.keys());
     this.ready = true;
+    if (stray.length) {
+      await this.save();
+      for (const f of stray) if (f.path !== this.ownPath(f.name)) await this.app.fileManager.trashFile(f);
+    }
     this.changed();
   }
 
@@ -99,12 +129,12 @@ export class ReviewStore extends Events {
     if (deleted) this.others.delete(file.path);
     else this.others.set(file.path, after);
     // Only the cards whose entries differ need replaying.
-    const sig = (e: LogEntry) => `${e.t}|${e.k}|${e.r ?? ""}|${e.a ?? ""}|${e.from ?? ""}`;
+    const sig = entrySig;
     const old = new Set(before.map(sig));
     const now = new Set(after.map(sig));
     const diff = [...after.filter((e) => !old.has(sig(e))), ...before.filter((e) => !now.has(sig(e)))];
     if (!diff.length) return;
-    this.entries = [...this.own.values(), ...this.others.values()].flat();
+    this.entries = this.allEntries();
     if (diff.some((e) => e.a === "link")) this.replayAll();
     else {
       this.regroup();
@@ -113,7 +143,17 @@ export class ReviewStore extends Events {
     this.changed();
   }
 
-  state(key: string): CardState | undefined {
+  /** Where this device's log for a given file name belongs: the data folder. */
+  private ownPath(name: string): string {
+    return normalizePath(`${this.folder()}/${name}`);
+  }
+
+  /** Every device's entries; a log present in two folders counts once. */
+  private allEntries(): LogEntry[] {
+    return dedupeEntries([...this.own.values(), ...this.others.values()].flat());
+  }
+
+    state(key: string): CardState | undefined {
     return this.states.get(key);
   }
 
