@@ -120,13 +120,13 @@ export class DashboardView extends ItemView {
   private deckPaths(): string[] {
     const out: string[] = [];
     const walk = (n: DeckNode) => n.children.forEach((c) => (out.push(c.path), walk(c)));
-    walk(deckTree(this.plugin.index));
+    walk(deckTree(this.plugin.index, this.plugin.settings.dedupe));
     return out;
   }
 
   private renderOverview(el: HTMLElement) {
     const { index, store, settings } = this.plugin;
-    const root = deckTree(index);
+    const root = deckTree(index, this.plugin.settings.dedupe);
     const all = index.allCards();
     const now = Date.now();
     const total = this.plugin.counts(all);
@@ -172,7 +172,8 @@ export class DashboardView extends ItemView {
     let topNode = root;
     while (topNode.children.length === 1 && !this.directNotes(topNode.path).length) topNode = topNode.children[0];
     const isTop = node === topNode;
-    const inDeck = (p: string) => (c: { deck: string }) => !p || c.deck === p || c.deck.startsWith(p + "/");
+    const index = this.plugin.index;
+    const deckCards = (path: string) => index.cardsIn({ kind: "deck", value: path });
 
     const nav = el.createDiv({ cls: "tc-crumbs" });
     if (trail.length === 1) nav.hide();
@@ -188,7 +189,7 @@ export class DashboardView extends ItemView {
 
     // This deck: what's waiting, and one button to study it.
     if (node !== root) {
-      const cards = all.filter(inDeck(node.path));
+      const cards = deckCards(node.path);
       const c = this.plugin.counts(cards);
       const head = el.createDiv({ cls: "tc-folder-head" });
       const info = head.createDiv({ cls: "tc-folder-info" });
@@ -211,7 +212,7 @@ export class DashboardView extends ItemView {
           inner.push(target.name);
         }
         const label: string | [string, string] = inner.length ? [child.name, inner.join(" / ")] : child.name;
-        const cards = all.filter(inDeck(target.path));
+        const cards = deckCards(target.path);
         this.row(list, "folder", label, cards, () => this.openFolder(target.path), () =>
           void this.plugin.study({ kind: "deck", value: target.path }, this.leaf),
         );
@@ -223,7 +224,7 @@ export class DashboardView extends ItemView {
       el.createDiv({ cls: "tc-section-label", text: "Notes" });
       const list = el.createDiv({ cls: "tc-list" });
       for (const n of notes) {
-        const cards = all.filter((c) => c.path === n.path);
+        const cards = index.cardsIn({ kind: "note", value: n.path });
         if (!cards.length) continue;
         const name = n.path.split("/").pop()!.replace(/\.md$/, "");
         const study = () => void this.plugin.study({ kind: "note", value: n.path }, this.leaf);

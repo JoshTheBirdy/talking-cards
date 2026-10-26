@@ -340,8 +340,8 @@ class SettingsTab extends PluginSettingTab {
       .setDesc("Read `Question ;; Answer` cards inside plain ``` blocks (decks kept there for copying). Code blocks with a language are never read.")
       .addToggle((t) => t.setValue(!!s.codeBlockCards).onChange((v) => ((s.codeBlockCards = v), save("index"))));
     new Setting(containerEl)
-      .setName("Study duplicates once")
-      .setDesc("The same question and answer in several notes counts as one card.")
+      .setName("Merge duplicate cards")
+      .setDesc("On: the same question and answer in several notes is one card with one history. Every folder and note it's written in still shows it, and a review shows it once. Off: every copy is shown, so a review can show the same card twice.")
       .addToggle((t) =>
         t.setValue(s.dedupe).onChange(async (v) => {
           s.dedupe = v;
@@ -350,8 +350,8 @@ class SettingsTab extends PluginSettingTab {
         }),
       );
     new Setting(containerEl)
-      .setName("Preferred copy")
-      .setDesc("Of the duplicates, study the one in a note whose name contains this (empty: the first found).")
+      .setName("Show context from")
+      .setDesc("When a review has the same card in several notes, show the title and headings of the note whose name contains this (empty: the first found). It never hides a card.")
       .addText((t) =>
         t.setValue(s.dedupePrefer).onChange(async (v) => {
           s.dedupePrefer = v;

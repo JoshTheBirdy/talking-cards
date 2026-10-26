@@ -38,7 +38,7 @@ and mobile, with no other plugins needed.
 - `deck: Some/Deck` overrides the folder deck.
 - `tts-front: es` / `tts-back: en-GB` picks a voice language per note.
 - `%%say: …%%` on a card line changes how it is read aloud.
-- The same card in several notes is studied once. This is a setting.
+- The same card written in several notes is one card with one review history. Every folder and note it's in still shows it, and each review shows it once. This is a setting.
 
 ### Editing cards
 

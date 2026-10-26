@@ -1,7 +1,7 @@
 {
   "id": "talking-cards",
   "name": "Talking Cards",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "minAppVersion": "1.8.7",
   "description": "Study flashcards written in your notes, with FSRS scheduling, swipe grading, image occlusion and voices that read cards aloud.",
   "author": "JoshTheBirdy",

@@ -63,8 +63,9 @@ export class CardBrowser {
     const now = Date.now();
     const eod = now + DAY;
     const q = this.query.toLowerCase().trim();
-    const rows = index.allCards().filter((c) => {
-      if (this.deck && c.deck !== this.deck && !c.deck.startsWith(this.deck + "/")) return false;
+    // A folder lists every card written in it, even ones that also live elsewhere.
+    const base = this.deck ? index.cardsIn({ kind: "deck", value: this.deck }) : index.allCards();
+    const rows = base.filter((c) => {
       const st = store.state(c.key);
       switch (this.filter) {
         case "new": if (!isNew(st) || st?.suspended) return false; break;

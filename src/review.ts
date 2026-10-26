@@ -104,10 +104,8 @@ export class ReviewView extends ItemView {
   }
 
   private scopeCards(): SessionCard[] {
-    const { kind, value } = this.study;
-    return this.plugin.index.allCards().filter((c) =>
-      kind === "all" ? true : kind === "note" ? c.path === value : c.deck === value || c.deck.startsWith(value + "/"),
-    );
+    // Every card written in this folder / note; copies of one card are served once.
+    return this.plugin.index.cardsIn(this.study);
   }
 
   async start() {

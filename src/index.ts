@@ -1,5 +1,6 @@
 import { Events, TFile, type App } from "obsidian";
 import { parseNote, expandBlock, assignTextIds, type Card, type CardBlock, type ParseOptions } from "./parser.ts";
+import { cardsInScope, type Scope } from "./scope.ts";
 
 export interface NoteCards {
   path: string;
@@ -16,28 +17,31 @@ export interface IndexSettings extends ParseOptions {
   dataFolder: string;
   /** Write `^tc-` IDs into notes. Off: cards are identified by their text and notes are never changed. */
   writeIds: boolean;
-  /** The same question + answer in several notes is studied once. */
+  /** The same question + answer in several notes is one card (one history), shown once per review. */
   dedupe: boolean;
-  /** With dedupe: the copy in a note whose name contains this wins (e.g. a "flashcards" sheet). */
+  /** With dedupe: when a review holds several copies, show the context of a note whose name contains this. */
   dedupePrefer: string;
   /** Editing a card's text keeps its history (matched by similarity; see links.ts). */
   trackEdits: boolean;
 }
 
-type IndexedCard = Card & { path: string; deck: string };
+export type IndexedCard = Card & { path: string; deck: string };
 
 /** Keeps every note's cards in memory and up to date as files change. Emits "changed". */
 export class CardIndex extends Events {
   notes = new Map<string, NoteCards>();
   ready = false;
+  /** Every copy of every card, duplicates included. */
   private cache: IndexedCard[] | null = null;
+  /** cardsIn() results, per scope. Cleared with `cache`. */
+  private scoped = new Map<string, IndexedCard[]>();
 
   constructor(private app: App, private settings: () => IndexSettings) {
     super();
   }
 
   async build() {
-    this.cache = null;
+    this.invalidate();
     this.notes.clear();
     let n = 0;
     for (const file of this.app.vault.getMarkdownFiles()) {
@@ -94,7 +98,7 @@ export class CardIndex extends Events {
       });
     const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
     const tts = { front: str(fm?.["tts-front"]), back: str(fm?.["tts-back"]) };
-    this.cache = null;
+    this.invalidate();
     this.notes.set(file.path, { path: file.path, deck: deck === "/" ? "" : deck, blocks, cards, tts });
     if (notify) this.trigger("changed");
     edited(blocks);
@@ -102,38 +106,45 @@ export class CardIndex extends Events {
 
   /** Recomputes the card list (dedupe settings changed); notes aren't re-read. */
   refresh() {
-    this.cache = null;
+    this.invalidate();
     this.trigger("changed");
   }
 
   remove(path: string, notify = true) {
     const had = this.notes.delete(path);
-    if (had) this.cache = null;
+    if (had) this.invalidate();
     if (had && notify) this.trigger("changed");
   }
 
-  /**
-   * Every card, in note order. With `dedupe`, a card found in several notes appears once —
-   * from a note whose name contains `dedupePrefer` if there is one, else the first.
-   */
-  allCards(): IndexedCard[] {
-    if (this.cache) return this.cache;
-    const notes = [...this.notes.values()];
-    const winner = new Map<string, string>();
-    const s = this.settings();
-    if (s.dedupe) {
-      const want = s.dedupePrefer.trim().toLowerCase();
-      const rank = (p: string) => (want && p.split("/").pop()!.toLowerCase().includes(want) ? 1 : 0);
-      for (const n of notes)
-        for (const c of n.cards) {
-          const cur = winner.get(c.key);
-          if (cur === undefined || rank(n.path) > rank(cur)) winner.set(c.key, n.path);
-        }
-    }
-    this.cache = notes.flatMap((n) =>
-      n.cards.filter((c) => !winner.size || winner.get(c.key) === n.path).map((c) => ({ ...c, path: n.path, deck: n.deck })),
-    );
+  private invalidate() {
+    this.cache = null;
+    this.scoped.clear();
+  }
+
+  /** Every copy of every card, in note order: a card written in two notes appears twice. */
+  copies(): IndexedCard[] {
+    this.cache ??= [...this.notes.values()].flatMap((n) => n.cards.map((c) => ({ ...c, path: n.path, deck: n.deck })));
     return this.cache;
+  }
+
+  /**
+   * The cards a review serves: every card written in the folder / note / vault. With `dedupe`,
+   * copies of the same card count once (they share one history either way).
+   */
+  cardsIn(scope: Scope): IndexedCard[] {
+    const id = `${scope.kind}\u0000${scope.value}`;
+    let list = this.scoped.get(id);
+    if (!list) {
+      const s = this.settings();
+      list = cardsInScope(this.copies(), scope, s.dedupe, s.dedupePrefer);
+      this.scoped.set(id, list);
+    }
+    return list;
+  }
+
+  /** Every card in the vault, each once. */
+  allCards(): IndexedCard[] {
+    return this.cardsIn({ kind: "all", value: "" });
   }
 }
 
@@ -145,24 +156,40 @@ export interface DeckNode {
   children: DeckNode[];
 }
 
-/** Folder tree of decks; counts include sub-decks. Folders without cards are left out. */
-export function deckTree(index: CardIndex): DeckNode {
+/**
+ * Folder tree of decks. `cards` is what studying that folder serves (sub-folders included), so a
+ * card written in two notes under one folder counts once. Folders without cards are left out.
+ */
+export function deckTree(index: CardIndex, dedupe = true): DeckNode {
   const root: DeckNode = { name: "All cards", path: "", cards: 0, notes: 0, children: [] };
-  for (const n of index.notes.values()) {
+  const keys = new Map<DeckNode, Set<string>>();
+  const count = (node: DeckNode, key: string) => {
+    if (!dedupe) return void node.cards++;
+    let set = keys.get(node);
+    if (!set) keys.set(node, (set = new Set()));
+    set.add(key);
+  };
+  const nodeFor = (deck: string, addNote: boolean): DeckNode[] => {
+    const chain = [root];
+    if (addNote) root.notes++;
+    if (!deck) return chain;
     let node = root;
-    node.cards += n.cards.length;
-    node.notes++;
-    if (!n.deck) continue;
     let path = "";
-    for (const part of n.deck.split("/")) {
+    for (const part of deck.split("/")) {
       path = path ? `${path}/${part}` : part;
       let child = node.children.find((c) => c.name === part);
       if (!child) node.children.push((child = { name: part, path, cards: 0, notes: 0, children: [] }));
-      child.cards += n.cards.length;
-      child.notes++;
+      if (addNote) child.notes++;
+      chain.push(child);
       node = child;
     }
+    return chain;
+  };
+  for (const n of index.notes.values()) {
+    const chain = nodeFor(n.deck, true);
+    for (const c of n.cards) for (const node of chain) count(node, c.key);
   }
+  if (dedupe) for (const [node, set] of keys) node.cards = set.size;
   const sort = (n: DeckNode) => {
     n.children.sort((a, b) => a.name.localeCompare(b.name));
     n.children.forEach(sort);
