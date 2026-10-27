@@ -141,11 +141,15 @@ export class DashboardView extends ItemView {
     stat(strip, "Day streak", streak(store.entries, now, settings.dayStartHour));
     stat(strip, "Cards", all.length);
 
-    const go = top.createEl("button", { cls: "mod-cta tc-study-all", text: total.due + total.new ? "Study all due cards" : "All done for today" });
+    // Switched-off cards aren't studied, but they still exist: the folder list (and its switches)
+    // must stay, or there'd be no way to switch anything back on.
+    const exists = all.length > 0 || index.cardsIn({ kind: "all", value: "" }, true).length > 0;
+    const label = !all.length && exists ? "Everything is switched off" : total.due + total.new ? "Study all due cards" : "All done for today";
+    const go = top.createEl("button", { cls: "mod-cta tc-study-all", text: label });
     go.disabled = !(total.due + total.new);
     go.onclick = () => void this.plugin.study({ kind: "all", value: "" }, this.leaf);
 
-    if (!all.length) {
+    if (!exists) {
       el.createEl("p", { cls: "tc-muted", text: "No cards yet. Write one in any note: Question ;; Answer" });
       return;
     }

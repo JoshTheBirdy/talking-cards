@@ -11,11 +11,15 @@ export class StudyFolders {
 
   constructor(private plugin: TalkingCards) {}
 
+  /**
+   * The one switch file. Devices may have different data folders, so pick the same file on every
+   * device (first by path) rather than "the one in my folder"; a new one only if none exists.
+   */
   private file(): TFile | null {
     const { vault } = this.plugin.app;
-    const here = vault.getAbstractFileByPath(normalizePath(`${this.plugin.settings.dataFolder}/${ACTIVITY_FILE}`));
-    if (here instanceof TFile) return here;
-    return vault.getFiles().find((f) => f.name === ACTIVITY_FILE && !f.path.startsWith(".trash/") && !f.path.startsWith(vault.configDir + "/")) ?? null;
+    const all = vault.getFiles().filter((f) => f.name === ACTIVITY_FILE && !f.path.startsWith(".trash/") && !f.path.startsWith(vault.configDir + "/"));
+    all.sort((a, b) => a.path.localeCompare(b.path));
+    return all[0] ?? null;
   }
 
   async load() {
